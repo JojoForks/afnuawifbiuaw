@@ -1,0 +1,1187 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+	<meta charset="UTF-8">
+	<script src="https://cdnjs.cloudflare.com/ajax/libs/Turf.js/6.5.0/turf.min.js"></script>
+	<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+	<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+	<style>
+		.zone-generator {
+			font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+			background-color: #ffffff !important;
+			color: #31333f !important;
+		}
+
+		.zone-generator h1 {
+			color: #31333f !important;
+			font-weight: 600 !important;
+			margin-bottom: 1rem !important;
+		}
+
+		.zone-generator label {
+			color: #31333f !important;
+			font-weight: 500 !important;
+			margin-bottom: 0.5rem !important;
+			display: inline-block !important;
+			min-width: 220px !important;
+		}
+
+		.zone-generator input[type="file"],
+		.zone-generator input[type="number"] {
+			background-color: #f0f2f6 !important;
+			border: 1px solid #e0e0e0 !important;
+			border-radius: 0.25rem !important;
+			color: #31333f !important;
+			padding: 0.5rem !important;
+			margin-bottom: 1rem !important;
+			width: 100% !important;
+			max-width: 400px !important;
+			font-family: inherit !important;
+		}
+
+		.zone-generator button {
+			background-color: #ff4b4b !important;
+			color: white !important;
+			border: none !important;
+			border-radius: 0.25rem !important;
+			padding: 0.5rem 1rem !important;
+			cursor: pointer !important;
+			font-weight: 500 !important;
+			transition: background-color 0.2s !important;
+			font-family: inherit !important;
+		}
+
+		.zone-generator button:hover {
+			background-color: #e63946 !important;
+		}
+
+		.zone-generator .group {
+			border: 1px solid #e0e0e0 !important;
+			padding: 1rem !important;
+			border-radius: 0.5rem !important;
+			margin: 1rem 0 !important;
+			background-color: #f0f2f6 !important;
+		}
+
+		.zone-generator .badge {
+			display: inline-block !important;
+			padding: 2px 8px !important;
+			border-radius: 10px !important;
+			background: #eef !important;
+			margin: 2px 4px 2px 0 !important;
+		}
+
+		.zone-generator button.small {
+			padding: 2px 8px !important;
+			margin-left: 8px !important;
+			font-size: 0.875rem !important;
+		}
+
+		.zone-generator #map {
+			height: 520px !important;
+			border: 1px solid #e0e0e0 !important;
+			border-radius: 0.5rem !important;
+			margin: 1rem 0 !important;
+		}
+
+		.zone-generator pre {
+			background-color: #f0f2f6 !important;
+			border: 1px solid #e0e0e0 !important;
+			border-radius: 0.25rem !important;
+			padding: 1rem !important;
+			color: #31333f !important;
+			overflow-x: auto !important;
+			white-space: pre-wrap !important;
+			word-wrap: break-word !important;
+			font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace !important;
+			font-size: 0.875rem !important;
+		}
+
+		/* Темная тема */
+		@media (prefers-color-scheme: dark) {
+			.zone-generator {
+				background-color: #0e1117 !important;
+				color: #fafafa !important;
+			}
+
+			.zone-generator h1,
+			.zone-generator label {
+				color: #fafafa !important;
+			}
+
+			.zone-generator input[type="file"],
+			.zone-generator input[type="number"] {
+				background-color: #262730 !important;
+				border-color: #4f4f4f !important;
+				color: #fafafa !important;
+			}
+
+			.zone-generator .group {
+				border-color: #4f4f4f !important;
+				background-color: #262730 !important;
+			}
+
+			.zone-generator #map {
+				border-color: #4f4f4f !important;
+			}
+
+			.zone-generator pre {
+				background-color: #262730 !important;
+				border-color: #4f4f4f !important;
+				color: #fafafa !important;
+			}
+
+			/* Прогресс-бары в темной теме */
+			.zone-generator #loadingProgressBar,
+			.zone-generator #incompatibleProgressBar {
+				background: #28a745 !important;
+			}
+
+			/* Центрированный прогресс-бар */
+			.zone-generator #loadingProgress {
+				text-align: center !important;
+				margin: 2rem 0 !important;
+			}
+		}
+	</style>
+</head>
+<body class="zone-generator">
+	<div id="fileSelectionPanel">
+		<label for="fileInput">Файл с зонами (GeoJSON или планирования):</label><br>
+		<input type="file" id="fileInput" accept=".geojson,.json"><br>
+		<div id="fileInfo" style="margin-bottom: 1rem; font-weight: 500;"></div>
+		<button id="loadButton">Загрузить</button>
+	</div>
+
+	<div id="loadingProgress" style="display:none; text-align: center; margin: 2rem 0;">
+		<div style="width:100%; max-width:400px; margin: 0 auto;">
+			<div style="width:100%; height:20px; background:#f0f2f6; border-radius:10px; overflow:hidden; margin-bottom: 8px;">
+				<div id="loadingProgressBar" style="height:100%; background:#28a745; width:0%; transition:width 0.3s;"></div>
+			</div>
+			<div id="loadingProgressText" style="font-size:0.875rem; font-weight: 500;"></div>
+		</div>
+	</div>
+
+	<div id="workPanel" style="display:none;">
+		<div class="group">
+			<label for="distanceInput">Введите дистанцию (в метрах):</label>
+			<input type="number" id="distanceInput" value="500">
+			<button id="setIncompatibleButton" style="margin-left:12px;">Установить несовместимые зоны</button>
+			<button id="loadIncompatibleButton" style="margin-left:12px;">Загрузить несовместимости из файла</button>
+			<input type="file" id="loadIncompatibleFileInput" accept=".json,.txt" style="display: none;">
+			<div id="incompatibleProgress" style="display:none; margin-top:8px;">
+				<div style="width:100%; height:20px; background:#f0f2f6; border-radius:10px; overflow:hidden;">
+					<div id="incompatibleProgressBar" style="height:100%; background:#ff4b4b; width:0%; transition:width 0.3s;"></div>
+				</div>
+				<div id="incompatibleProgressText" style="text-align:center; margin-top:4px; font-size:0.875rem;"></div>
+			</div>
+		</div>
+
+		<div id="map" style="margin: 12px 0;"></div>
+
+		<button id="toggleCostSettingsButton" style="margin: 1rem 0;">Показать настройки стоимости</button>
+		<div id="costSettingsGroup" class="group" style="display: none;">
+			<h3>Генерация формулы штрафов за доп зоны</h3>
+			<div style="margin-bottom: 1rem;">
+				<label for="costInput">Базовая стоимость:</label><br>
+				<input type="number" id="costInput" value="800" min="1" style="width: 200px; margin-bottom: 1rem;"><br>
+
+				<label for="penaltyStartZoneInput">Зоны для начала штрафа (по умолчанию 2):</label><br>
+				<input type="number" id="penaltyStartZoneInput" value="1" min="1" style="width: 200px; margin-bottom: 1rem;"><br>
+
+				<label for="coefficientInput">Коэффициент a (макс: <span id="maxCoeffDisplay">0.166</span>):</label><br>
+				<input type="number" id="coefficientInput" value="0.01" step="0.001" min="0.01" style="width: 200px; margin-bottom: 1rem;"><br>
+
+				<label for="zonesForMaxPenaltyInput">Зон для макс. штрафа:</label><br>
+				<input type="number" id="zonesForMaxPenaltyInput" value="6" min="2" style="width: 200px; margin-bottom: 1rem;">
+			</div>
+			<button id="saveFormulaButton">Сохранить формулу</button>
+			<button id="togglePreviewButton" style="margin-left:12px;">Показать/скрыть таблицу</button>
+			<div id="penaltyPreview" style="margin-top: 1rem; display: none;"></div>
+		</div>
+
+		<div class="group">
+			<button id="saveResultButton">Сохранить результат</button>
+			<button id="selectAnotherFileButton" style="margin-left:12px;">Выбрать другой файл</button>
+		</div>
+	</div>
+
+	<script>
+		let components = [];
+		let zoneNameToComponentIndex = new Map();
+		let compatibleGroups = [];
+		let compatibleGroupsSet = new Set();
+		let allZoneNames = [];
+		let map, baseLayer, zonesLayerGroup;
+		let nameToLeafletLayer = new Map();
+		let currentCenter = null;
+		let adjacencyGlobal = new Map();
+		let selectedNeighborsByZone = new Map();
+		let planningData = null;
+		let loadedGeoJSON = null;
+		let currentFeatures = null;
+
+		function determineFileType(data) {
+			if (data && typeof data === 'object') {
+				if (data.zones && Array.isArray(data.zones)) {
+					return 'planning';
+				}
+				if (data.features && Array.isArray(data.features)) {
+					return 'geojson';
+				}
+			}
+			return 'unknown';
+		}
+
+		document.getElementById('fileInput').addEventListener('change', (e) => {
+			const file = e.target.files[0];
+			const fileInfo = document.getElementById('fileInfo');
+
+			if (file) {
+				const reader = new FileReader();
+				reader.onload = function(e) {
+					try {
+						const data = JSON.parse(e.target.result);
+						const fileType = determineFileType(data);
+
+						if (fileType === 'planning') {
+							planningData = data;
+							loadedGeoJSON = null;
+							const zoneCount = data.zones ? data.zones.length : 0;
+							fileInfo.textContent = `Выбран файл планирования с ${zoneCount} зон(ами)`;
+							fileInfo.style.color = '#28a745';
+						} else if (fileType === 'geojson') {
+							loadedGeoJSON = data;
+							planningData = null;
+							const zoneCount = data.features ? data.features.length : 0;
+							fileInfo.textContent = `Выбран файл GeoJSON с ${zoneCount} зон(ами)`;
+							fileInfo.style.color = '#007bff';
+						} else {
+							fileInfo.textContent = 'Неподдерживаемый формат файла';
+							fileInfo.style.color = '#dc3545';
+							planningData = null;
+							loadedGeoJSON = null;
+						}
+					} catch (error) {
+						fileInfo.textContent = 'Ошибка при чтении файла: ' + error.message;
+						fileInfo.style.color = '#dc3545';
+						planningData = null;
+						loadedGeoJSON = null;
+					}
+				};
+				reader.readAsText(file);
+			} else {
+				fileInfo.textContent = '';
+				planningData = null;
+				loadedGeoJSON = null;
+			}
+		});
+
+		document.getElementById('loadButton').addEventListener('click', async () => {
+			if (!planningData && !loadedGeoJSON) {
+				alert('Пожалуйста, выберите файл с зонами.');
+				return;
+			}
+
+			document.getElementById('fileSelectionPanel').style.display = 'none';
+
+			const progressDiv = document.getElementById('loadingProgress');
+			const progressBar = document.getElementById('loadingProgressBar');
+			const progressText = document.getElementById('loadingProgressText');
+
+			progressDiv.style.display = 'block';
+			progressText.textContent = 'Инициализация карты...';
+
+			await initializeMapOnly();
+			document.getElementById('workPanel').style.display = 'block';
+			// Небольшая задержка, чтобы браузер успел отрисовать элементы DOM и Leaflet смог пересчитать размер
+			await new Promise(resolve => setTimeout(resolve, 50));
+			if (map) {
+				map.invalidateSize(); // Принудительно обновляем размер карты
+			}
+
+			if (planningData) {
+				progressText.textContent = 'Обработка файла планирования...';
+				await processPlanningData();
+			} else if (loadedGeoJSON) {
+				progressText.textContent = 'Загрузка зон на карту...';
+				await processGeoJSON(loadedGeoJSON);
+			}
+		});
+
+		document.getElementById('setIncompatibleButton').addEventListener('click', async () => {
+			const radiusInput = document.getElementById('distanceInput').value;
+			const radius = parseFloat(radiusInput) || 500;
+
+			if (!currentFeatures || currentFeatures.length === 0) {
+				alert('Нет загруженных зон для пересчета.');
+				return;
+			}
+
+			const button = document.getElementById('setIncompatibleButton');
+			const progressDiv = document.getElementById('incompatibleProgress');
+			const progressBar = document.getElementById('incompatibleProgressBar');
+			const progressText = document.getElementById('incompatibleProgressText');
+
+			button.disabled = true;
+			progressDiv.style.display = 'block';
+			progressText.textContent = 'Расчет несовместимых зон...';
+
+			const edges = new Map();
+			for (let name of allZoneNames) edges.set(name, new Set());
+
+			const featureCoords = currentFeatures.map(feature => turf.coordAll(feature));
+			const totalPairs = (currentFeatures.length * (currentFeatures.length - 1)) / 2;
+			let processedPairs = 0;
+
+			for (let i = 0; i < currentFeatures.length; i++) {
+				const feature1 = currentFeatures[i];
+				const name1 = feature1.properties.description;
+				for (let j = i + 1; j < currentFeatures.length; j++) {
+					const feature2 = currentFeatures[j];
+					const name2 = feature2.properties.description;
+
+					const intersects = turf.booleanIntersects(feature1, feature2);
+
+					let minDistance = Infinity;
+					const coords1 = featureCoords[i];
+					const coords2 = featureCoords[j];
+					for (let p1 of coords1) {
+						for (let p2 of coords2) {
+							const point1 = turf.point(p1);
+							const point2 = turf.point(p2);
+							const distance = turf.distance(point1, point2, { units: 'meters' });
+							if (distance < minDistance) minDistance = distance;
+							if (minDistance <= radius) break;
+						}
+						if (minDistance <= radius) break;
+					}
+
+					if (intersects || minDistance <= radius) {
+						edges.get(name1).add(name2);
+						edges.get(name2).add(name1);
+					}
+
+					processedPairs++;
+					const progress = (processedPairs / totalPairs) * 100;
+					progressBar.style.width = progress + '%';
+					progressText.textContent = `Обработано ${processedPairs} из ${totalPairs} пар зон`;
+
+					if (processedPairs % 100 === 0) {
+						await new Promise(resolve => setTimeout(resolve, 10));
+					}
+				}
+			}
+
+		// Инвертируем: edges содержат близкие зоны, но мы хотим их как совместимые
+		// Поэтому сохраняем edges в selectedNeighborsByZone (совместимые)
+		selectedNeighborsByZone = edges;
+
+		// А несовместимости - это все остальные пары
+		adjacencyGlobal = new Map();
+		allZoneNames.forEach(a => adjacencyGlobal.set(a, new Set()));
+		for (let i = 0; i < allZoneNames.length; i++) {
+			for (let j = i + 1; j < allZoneNames.length; j++) {
+				const a = allZoneNames[i];
+				const b = allZoneNames[j];
+				const compatible = selectedNeighborsByZone.get(a)?.has(b) || selectedNeighborsByZone.get(b)?.has(a);
+				if (!compatible) {
+					adjacencyGlobal.get(a).add(b);
+					adjacencyGlobal.get(b).add(a);
+				}
+			}
+		}
+
+		// Перестраиваем компоненты и обновляем отображение
+		rebuildComponentsFromSelections();
+		clearAllStyles();
+
+		progressDiv.style.display = 'none';
+		button.disabled = false;
+		
+		const compatibleCount = Array.from(selectedNeighborsByZone.values()).reduce((sum, set) => sum + set.size, 0) / 2;
+		const incompatibleCount = Array.from(adjacencyGlobal.values()).reduce((sum, set) => sum + set.size, 0) / 2;
+		alert(`Зоны обработаны. Найдено ${compatibleCount} совместимых пар (близкие/пересекающиеся) и ${incompatibleCount} несовместимых пар.`);
+		});
+
+		document.getElementById('loadIncompatibleButton').addEventListener('click', () => {
+			document.getElementById('loadIncompatibleFileInput').click();
+		});
+
+		document.getElementById('loadIncompatibleFileInput').addEventListener('change', (e) => {
+			const file = e.target.files[0];
+			if (!file) return;
+
+			const reader = new FileReader();
+			reader.onload = function(e) {
+				try {
+					const data = JSON.parse(e.target.result);
+					let incompatibleZones = [];
+					let compatibleZones = [];
+
+					// Поддержка форматов:
+					// 1) { options: { incompatible_zones, compatible_zones? } }
+					// 2) { incompatible_zones, compatible_zones? }
+					if (data && data.options && Array.isArray(data.options.incompatible_zones)) {
+						incompatibleZones = data.options.incompatible_zones;
+						if (Array.isArray(data.options.compatible_zones)) compatibleZones = data.options.compatible_zones;
+					} else if (data && Array.isArray(data.incompatible_zones)) {
+						incompatibleZones = data.incompatible_zones;
+						if (Array.isArray(data.compatible_zones)) compatibleZones = data.compatible_zones;
+					} else {
+						alert('Неверный формат файла. Ожидается массив incompatible_zones.');
+						return;
+					}
+
+					// Полный сброс: перезаписываем совместимости с нуля
+					selectedNeighborsByZone = new Map();
+					allZoneNames.forEach(name => {
+						selectedNeighborsByZone.set(name, new Set());
+					});
+
+					// Применение несовместимых зон
+					// 1) Построим несовместимости в adjacencyGlobal
+					adjacencyGlobal = new Map();
+					allZoneNames.forEach(name => adjacencyGlobal.set(name, new Set()));
+					for (let group of incompatibleZones) {
+						if (!Array.isArray(group)) continue;
+						if (group.length === 2) {
+							const a = String(group[0]).trim();
+							const b = String(group[1]).trim();
+							if (a && b && a !== b && adjacencyGlobal.has(a) && adjacencyGlobal.has(b)) {
+								adjacencyGlobal.get(a).add(b);
+								adjacencyGlobal.get(b).add(a);
+							}
+						} else if (group.length > 2) {
+							for (let i = 0; i < group.length; i++) {
+								for (let j = i + 1; j < group.length; j++) {
+									const a = String(group[i]).trim();
+									const b = String(group[j]).trim();
+									if (a && b && a !== b && adjacencyGlobal.has(a) && adjacencyGlobal.has(b)) {
+										adjacencyGlobal.get(a).add(b);
+										adjacencyGlobal.get(b).add(a);
+									}
+								}
+							}
+						}
+					}
+
+					// 2) Если нет compatible_zones — вычислим совместимости как дополнение к несовместимостям
+					if (!compatibleZones || compatibleZones.length === 0) {
+						selectedNeighborsByZone = new Map();
+						allZoneNames.forEach(a => selectedNeighborsByZone.set(a, new Set()));
+						for (let i = 0; i < allZoneNames.length; i++) {
+							for (let j = i + 1; j < allZoneNames.length; j++) {
+								const a = allZoneNames[i];
+								const b = allZoneNames[j];
+								const incompatible = adjacencyGlobal.get(a)?.has(b) || adjacencyGlobal.get(b)?.has(a);
+								if (!incompatible) {
+									selectedNeighborsByZone.get(a).add(b);
+									selectedNeighborsByZone.get(b).add(a);
+								}
+							}
+						}
+					}
+
+					// Применение совместимых зон (если есть) — добавляем только совместимости
+					let appliedCompatible = 0;
+					if (compatibleZones && compatibleZones.length) {
+						appliedCompatible = applyCompatibleFromPlanning(compatibleZones);
+					}
+
+					rebuildComponentsFromSelections();
+
+					alert(`Загружены несовместимые зоны из файла`);
+
+				} catch (error) {
+					alert('Ошибка при чтении файла: ' + error.message);
+				}
+			};
+			reader.readAsText(file);
+
+			// Сброс input для возможности повторного выбора того же файла
+			e.target.value = '';
+		});
+
+		document.getElementById('saveFormulaButton').addEventListener('click', () => {
+			const zonesList = allZoneNames.slice().sort();
+			const zoneExprs = zonesList.map(z => `has_location(in_zone('${z}'))`).join(' + ');
+			const penaltyStartZone = parseFloat(document.getElementById('penaltyStartZoneInput').value) || 2;
+			const zonesForMaxPenalty = parseFloat(document.getElementById('zonesForMaxPenaltyInput').value) || 6;
+
+			const a = parseFloat(document.getElementById('coefficientInput').value) || 0.166;
+			const mTerm = `max(( ${zoneExprs} ) - 1, 0)`;
+			const cost = parseFloat(document.getElementById('costInput').value) || 0;
+			
+			const limitedMTerm = `min(${mTerm}, ${zonesForMaxPenalty - 1})`;
+			const effectiveZones = `max((${limitedMTerm} - ${penaltyStartZone - 1}), 0)`;
+			const costExpr = `${cost} * ((1 - ${a}) / ${a}) * max((1 / (1 - ${a} * ${effectiveZones}) - 1), 0)`;
+
+			downloadJsonFile({ cost: costExpr }, 'cost_formula.json');
+		});
+
+	document.getElementById('saveResultButton').addEventListener('click', () => {
+		rebuildComponentsFromSelections();
+		const incompatibleExport = buildIncompatibleExport();
+		const compatibleExport = buildCompatibleExport();
+		const cost = parseFloat(document.getElementById('costInput').value) || 0;
+		const zonesList = allZoneNames.slice().sort();
+		const zoneExprs = zonesList.map(z => `has_location(in_zone('${z}'))`).join(' + ');
+		const mTerm = `max(( ${zoneExprs} ) - 1, 0)`;
+
+		if (planningData) {
+			const updatedPlanning = JSON.parse(JSON.stringify(planningData));
+			updatedPlanning.options.incompatible_zones = incompatibleExport;
+			updatedPlanning.options.compatible_zones = compatibleExport;
+			downloadJsonFile(updatedPlanning, 'planning.json');
+		} else {
+			const result = {
+				incompatible_zones: incompatibleExport,
+				compatible_zones: compatibleExport
+			};
+			downloadJsonFile(result, 'options_preset.json');
+		}
+	});
+
+		document.getElementById('selectAnotherFileButton').addEventListener('click', () => {
+			resetToFileSelection();
+		});
+
+		function resetToFileSelection() {
+			document.getElementById('workPanel').style.display = 'none';
+			document.getElementById('loadingProgress').style.display = 'none';
+
+			document.getElementById('fileSelectionPanel').style.display = 'block';
+
+			components = [];
+			zoneNameToComponentIndex = new Map();
+			compatibleGroups = [];
+			compatibleGroupsSet = new Set();
+			allZoneNames = [];
+			adjacencyGlobal = new Map();
+			selectedNeighborsByZone = new Map();
+			planningData = null;
+			loadedGeoJSON = null;
+			currentFeatures = null;
+
+			if (map) {
+				map.remove();
+				map = null;
+			}
+
+			document.getElementById('fileInfo').textContent = '';
+
+			document.getElementById('loadingProgressBar').style.width = '0%';
+			document.getElementById('incompatibleProgressBar').style.width = '0%';
+
+			document.getElementById('fileInput').value = '';
+		}
+
+		function extractCompatibleGroupsFromPlanning() {
+			if (!planningData || !planningData.options || !planningData.options.compatible_zones) {
+				return null;
+			}
+			return planningData.options.compatible_zones;
+		}
+
+	function buildIncompatibleExport() {
+		const result = [];
+		const usedPairs = new Set();
+		const zones = allZoneNames.slice().sort();
+		
+		const pairKey = (a, b) => {
+			const x = a < b ? a : b;
+			const y = a < b ? b : a;
+			return x + '|' + y;
+		};
+
+		// Экспортируем пары несовместимых зон из adjacencyGlobal
+		zones.forEach(a => {
+			const incompatible = Array.from((adjacencyGlobal.get(a) || new Set())).filter(b => a < b).sort();
+			incompatible.forEach(b => {
+				const key = pairKey(a, b);
+				if (!usedPairs.has(key)) {
+					result.push([a, b]);
+					usedPairs.add(key);
+				}
+			});
+		});
+
+		return result;
+	}
+
+	function buildCompatibleExport() {
+		const result = [];
+		const usedPairs = new Set();
+		const zones = allZoneNames.slice().sort();
+		const hasEdge = (a, b) => {
+			const setA = selectedNeighborsByZone.get(a) || new Set();
+			return setA.has(b);
+		};
+		const pairKey = (a, b) => {
+			const x = a < b ? a : b;
+			const y = a < b ? b : a;
+			return x + '|' + y;
+		};
+
+		// 1) Ищем тройки-клики
+		for (let i = 0; i < zones.length; i++) {
+			for (let j = i + 1; j < zones.length; j++) {
+				for (let k = j + 1; k < zones.length; k++) {
+					const a = zones[i], b = zones[j], c = zones[k];
+					if (hasEdge(a, b) && hasEdge(a, c) && hasEdge(b, c)) {
+						const k1 = pairKey(a, b), k2 = pairKey(a, c), k3 = pairKey(b, c);
+						if (!usedPairs.has(k1) && !usedPairs.has(k2) && !usedPairs.has(k3)) {
+							result.push([a, b, c]);
+							usedPairs.add(k1); usedPairs.add(k2); usedPairs.add(k3);
+						}
+					}
+				}
+			}
+		}
+
+		// 2) Добавляем оставшиеся пары
+		zones.forEach(a => {
+			const neighbors = Array.from((selectedNeighborsByZone.get(a) || new Set())).filter(b => a < b).sort();
+			neighbors.forEach(b => {
+				const key = pairKey(a, b);
+				if (!usedPairs.has(key)) {
+					result.push([a, b]);
+					usedPairs.add(key);
+				}
+			});
+		});
+
+		return result;
+	}
+
+		function applyCompatibleFromPlanning(groups) {
+			// Не очищаем selectedNeighborsByZone, а дополняем существующие связи
+			let applied = 0;
+			groups.forEach(group => {
+				if (!Array.isArray(group) || group.length < 2) return;
+				if (group.length === 2) {
+					const a = String(group[0]).trim();
+					const b = String(group[1]).trim();
+					if (a && b && a !== b && selectedNeighborsByZone.has(a) && selectedNeighborsByZone.has(b)) {
+						selectedNeighborsByZone.get(a).add(b);
+						selectedNeighborsByZone.get(b).add(a);
+						applied++;
+					}
+				} else if (group.length === 3) {
+					const a = String(group[0]).trim();
+					const b = String(group[1]).trim();
+					const c = String(group[2]).trim();
+					const triples = [[a,b],[a,c],[b,c]];
+					triples.forEach(([x,y]) => {
+						if (x && y && x !== y && selectedNeighborsByZone.has(x) && selectedNeighborsByZone.has(y)) {
+							selectedNeighborsByZone.get(x).add(y);
+							selectedNeighborsByZone.get(y).add(x);
+							applied++;
+						}
+					});
+				} else {
+					const center = String(group[0]).trim();
+					for (let i = 1; i < group.length; i++) {
+						const other = String(group[i]).trim();
+						if (center && other && center !== other && selectedNeighborsByZone.has(center) && selectedNeighborsByZone.has(other)) {
+							selectedNeighborsByZone.get(center).add(other);
+							selectedNeighborsByZone.get(other).add(center);
+							applied++;
+						}
+					}
+				}
+			});
+			return applied;
+		}
+
+		async function processPlanningData() {
+			if (!planningData || !planningData.zones) {
+				alert('Файл планирования не содержит зон для обработки.');
+				return;
+			}
+
+			// Преобразуем зоны из формата планирования в GeoJSON
+			const geojsonFeatures = planningData.zones.map(zone => ({
+				type: 'Feature',
+				geometry: zone.geometry,
+				properties: {
+					description: zone.id
+				}
+			}));
+
+			const geojson = {
+				type: 'FeatureCollection',
+				features: geojsonFeatures
+			};
+
+			await processGeoJSON(geojson);
+		}
+
+		async function processGeoJSON(geojson) {
+			components = [];
+			zoneNameToComponentIndex = new Map();
+			compatibleGroups = [];
+			compatibleGroupsSet = new Set();
+			allZoneNames = [];
+			adjacencyGlobal = new Map();
+			selectedNeighborsByZone = new Map();
+
+			const planningCompatibleGroups = extractCompatibleGroupsFromPlanning();
+
+			const features = normalizeFeatures(geojson);
+			if (!features || features.length === 0) {
+				alert('Файл не содержит корректных геозон для обработки.');
+				return;
+			}
+
+			currentFeatures = features;
+			for (let feature of features) {
+				if (!feature.properties || !feature.properties.description) {
+					return;
+				}
+			}
+
+			allZoneNames = features.map(f => f.properties.description);
+
+			if (planningCompatibleGroups && planningCompatibleGroups.length > 0) {
+				allZoneNames.forEach(name => {
+					selectedNeighborsByZone.set(name, new Set());
+				});
+				const appliedCount = applyCompatibleFromPlanning(planningCompatibleGroups);
+			} else {
+				allZoneNames.forEach(name => {
+					selectedNeighborsByZone.set(name, new Set());
+				});
+			}
+
+			rebuildComponentsFromSelections();
+			await loadZonesToMap(features);
+
+			document.getElementById('loadingProgress').style.display = 'none';
+		}
+
+		function renderGroupsUI() { }
+
+		async function initializeMapOnly() {
+			const mapDiv = document.getElementById('map');
+			mapDiv.style.display = 'block';
+
+			if (!map) {
+				map = L.map('map').setView([55.7558, 37.6173], 10);
+				baseLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+					maxZoom: 19,
+					attribution: '&copy; OpenStreetMap contributors'
+				}).addTo(map);
+				zonesLayerGroup = L.layerGroup().addTo(map);
+
+				await new Promise((resolve) => {
+					map.on('load', () => resolve());
+					setTimeout(resolve, 2000);
+				});
+			}
+		}
+
+		async function loadZonesToMap(features) {
+			zonesLayerGroup.clearLayers();
+			nameToLeafletLayer = new Map();
+
+			const bounds = [];
+			const progressBar = document.getElementById('loadingProgressBar');
+			const progressText = document.getElementById('loadingProgressText');
+
+			for (let i = 0; i < features.length; i++) {
+				const f = features[i];
+				const name = f.properties.description;
+
+				const gj = L.geoJSON(f, {
+					style: { color: '#3388ff', weight: 2, fillOpacity: 0.25 }
+				}).addTo(zonesLayerGroup);
+
+				gj.on('click', (e) => onLeftClickZone(name, e));
+				gj.on('contextmenu', (e) => onRightClickZone(name, e));
+				nameToLeafletLayer.set(name, gj);
+
+				try { bounds.push(gj.getBounds()); } catch (e) {}
+
+				const progress = ((i + 1) / features.length) * 100;
+				progressBar.style.width = progress + '%';
+				progressText.textContent = `Загружено ${i + 1} из ${features.length} зон`;
+
+				await new Promise(resolve => setTimeout(resolve, 10));
+			}
+
+			if (bounds.length) {
+				let union = bounds[0];
+				for (let i = 1; i < bounds.length; i++) union = union.extend(bounds[i]);
+				map.fitBounds(union.pad(0.1));
+			}
+
+			if (map) {
+				map.invalidateSize();
+			}
+		}
+
+		function focusOnZone(name) {
+			if (currentCenter === name) {
+				clearAllStyles();
+				currentCenter = null;
+				return;
+			}
+			currentCenter = name;
+			highlightZoneAndNeighbors(name);
+		}
+
+		function highlightZoneAndNeighbors(name) {
+			clearAllStyles();
+			const centerLayer = nameToLeafletLayer.get(name);
+			if (centerLayer) {
+				centerLayer.setStyle({ color: '#d33', weight: 3, fillOpacity: 0.35 });
+			}
+			let unionBounds = centerLayer ? centerLayer.getBounds() : null;
+			(selectedNeighborsByZone.get(name) || new Set()).forEach(nei => {
+				const l = nameToLeafletLayer.get(nei);
+				if (l) {
+					l.setStyle({ color: '#e600ff', weight: 3, fillOpacity: 0.3 });
+					try { unionBounds = unionBounds ? unionBounds.extend(l.getBounds()) : l.getBounds(); } catch (e) {}
+				}
+			});
+			if (unionBounds) {
+				try { map.fitBounds(unionBounds.pad(0.2)); } catch (e) {}
+			}
+		}
+
+		function clearAllStyles() {
+			nameToLeafletLayer.forEach(layer => layer.setStyle({ color: '#3388ff', weight: 2, fillOpacity: 0.25 }));
+		}
+
+		function toggleCompatibility(a, b) {
+			if (!selectedNeighborsByZone.has(a)) selectedNeighborsByZone.set(a, new Set());
+			if (!selectedNeighborsByZone.has(b)) selectedNeighborsByZone.set(b, new Set());
+			const setA = selectedNeighborsByZone.get(a);
+			const setB = selectedNeighborsByZone.get(b);
+			if (setA.has(b)) {
+				setA.delete(b);
+				setB.delete(a);
+			} else {
+				setA.add(b);
+				setB.add(a);
+			}
+		}
+
+		function onLeftClickZone(name, e) {
+			const withModifier = (e && (e.originalEvent ? (e.originalEvent.shiftKey || e.originalEvent.ctrlKey || e.originalEvent.altKey || e.originalEvent.metaKey) : (e.shiftKey || e.ctrlKey || e.altKey || e.metaKey)));
+			if (withModifier && currentCenter && currentCenter !== name) {
+				toggleCompatibility(currentCenter, name);
+				highlightZoneAndNeighbors(currentCenter);
+				rebuildComponentsFromSelections();
+				renderGroupsUI();
+				return;
+			}
+			focusOnZone(name);
+		}
+
+		function onRightClickZone(name, e) {
+			if (e && e.originalEvent && e.originalEvent.preventDefault) e.originalEvent.preventDefault();
+			if (e && e.originalEvent && e.originalEvent.stopPropagation) e.originalEvent.stopPropagation();
+			if (!currentCenter) return;
+			if (currentCenter === name) return;
+			const a = currentCenter;
+			const b = name;
+			toggleCompatibility(a, b);
+			highlightZoneAndNeighbors(a);
+			rebuildComponentsFromSelections();
+			renderGroupsUI();
+		}
+
+		function rebuildComponentsFromSelections() {
+			const processed = new Set();
+			components = [];
+
+			for (const name of allZoneNames.slice().sort()) {
+				if (processed.has(name)) continue;
+
+				const neighbors = Array.from(selectedNeighborsByZone.get(name) || []).sort();
+				if (neighbors.length > 0) {
+					const group = [name, ...neighbors];
+					components.push(group);
+
+					group.forEach(zone => processed.add(zone));
+				}
+			}
+		}
+
+
+		function normalizeFeatures(geojson) {
+			if (geojson.features && Array.isArray(geojson.features)) {
+				return geojson.features;
+			} else if (geojson.zones && Array.isArray(geojson.zones)) {
+				return geojson.zones.map(zone => {
+					return {
+						type: 'Feature',
+						geometry: zone.geometry,
+						properties: {
+							description: zone.id
+						}
+					};
+				});
+			} else {
+				alert('Неподдерживаемый формат файла.');
+				return [];
+			}
+		}
+
+		function downloadJsonFile(data, filename) {
+			const dataStr = JSON.stringify(data, null, 2);
+			const blob = new Blob([dataStr], { type: "application/json" });
+			const url = URL.createObjectURL(blob);
+			const a = document.createElement('a');
+			a.href = url;
+			a.download = filename;
+			document.body.appendChild(a);
+			a.click();
+			document.body.removeChild(a);
+			URL.revokeObjectURL(url);
+		}
+
+		function calculatePenalty(numZones, cost, penaltyStartZone, maxPenalty, zonesForMaxPenalty) {
+			if (numZones < penaltyStartZone) return 0;
+			
+			if (numZones > zonesForMaxPenalty) {
+				return calculatePenalty(zonesForMaxPenalty, cost, penaltyStartZone, maxPenalty, zonesForMaxPenalty);
+			}
+
+			const a = parseFloat(document.getElementById('coefficientInput').value) || 0.166;
+			const mTermValue = Math.max(0, numZones - 1);
+			const inner = Math.max(Math.min(mTermValue, zonesForMaxPenalty) - (penaltyStartZone - 1), 0);
+			if (inner <= 0) return 0; // Если inner <= 0, то штрафа нет
+			const penalty = cost * ((1 - a) / a) * (1 / (1 - a * inner) - 1);
+			return Math.max(0, penalty);
+		}
+
+		function updatePenaltyPreview() {
+			const zonesForMaxPenalty = parseFloat(document.getElementById('zonesForMaxPenaltyInput').value) || 6;
+			
+			const minPenaltyStart = 1;
+			const maxPenaltyStart = Math.max(1, zonesForMaxPenalty - 1);
+			let penaltyStartZone = parseFloat(document.getElementById('penaltyStartZoneInput').value);
+			
+			if (!penaltyStartZone || penaltyStartZone < minPenaltyStart || penaltyStartZone > maxPenaltyStart) {
+				penaltyStartZone = Math.min(2, maxPenaltyStart);
+				document.getElementById('penaltyStartZoneInput').value = penaltyStartZone;
+			}
+			
+			const penaltyPreviewDiv = document.getElementById('penaltyPreview');
+
+			const activeZones = Math.max(1, zonesForMaxPenalty - penaltyStartZone + 1);
+			const maxAllowedA = 1 / activeZones;
+			
+			document.getElementById('maxCoeffDisplay').textContent = maxAllowedA.toFixed(3);
+			
+			let userA = parseFloat(document.getElementById('coefficientInput').value);
+			if (!userA || userA <= 0) {
+				userA = Math.min(0.166, maxAllowedA);
+			}
+			if (userA > maxAllowedA) {
+				userA = maxAllowedA;
+				document.getElementById('coefficientInput').value = userA.toFixed(3);
+			}
+			const a = Math.max(0.01, userA);
+			
+			const actualStart = penaltyStartZone - 1;
+			const innerForMax = zonesForMaxPenalty - 2 * actualStart + 2;
+
+			let cost = parseFloat(document.getElementById('costInput').value) || 0;
+			
+			let maxPenalty = 0;
+			if (innerForMax > 0) {
+				const multiplier = ((1 - a) / a) * (1 / (1 - a * innerForMax) - 1);
+				maxPenalty = cost * multiplier;
+			}
+
+			if (cost <= 0) {
+				penaltyPreviewDiv.innerHTML = '<p style="color: #dc3545;">Базовая стоимость должна быть больше 0 для расчета штрафов.</p>';
+				return;
+			}
+
+			let previewHtml = '<h4>Предпросмотр штрафов:</h4><table style="width:100%; border-collapse: collapse; line-height: 1.2;"><thead><tr><th style="border: 1px solid #ccc; padding: 4px 8px; text-align: left;">Количество зон</th><th style="border: 1px solid #ccc; padding: 4px 8px; text-align: left;">Штраф</th></tr></thead><tbody>';
+
+			const maxZonesToPreview = zonesForMaxPenalty + 4;
+			for (let i = 1; i <= maxZonesToPreview; i++) {
+				const penalty = calculatePenalty(i, cost, penaltyStartZone, maxPenalty, zonesForMaxPenalty);
+				previewHtml += `<tr><td style="border: 1px solid #ccc; padding: 4px 8px;">${i}</td><td style="border: 1px solid #ccc; padding: 4px 8px;">${penalty.toFixed(2)}</td></tr>`;
+			}
+
+			previewHtml += '</tbody></table>';
+			penaltyPreviewDiv.innerHTML = previewHtml;
+		}
+
+		document.addEventListener('DOMContentLoaded', updatePenaltyPreview);
+		document.getElementById('costInput').addEventListener('input', updatePenaltyPreview);
+		document.getElementById('penaltyStartZoneInput').addEventListener('change', updatePenaltyPreview);
+		document.getElementById('coefficientInput').addEventListener('input', updatePenaltyPreview);
+		document.getElementById('zonesForMaxPenaltyInput').addEventListener('change', updatePenaltyPreview);
+		
+		document.getElementById('penaltyStartZoneInput').addEventListener('input', function() {
+			const value = parseInt(this.value);
+			const maxZones = parseInt(document.getElementById('zonesForMaxPenaltyInput').value) || 6;
+			if (value < 1) this.value = 1;
+			if (value >= maxZones) this.value = Math.max(1, maxZones - 1);
+		});
+		
+		document.getElementById('zonesForMaxPenaltyInput').addEventListener('input', function() {
+			const value = parseInt(this.value);
+			const startZone = parseInt(document.getElementById('penaltyStartZoneInput').value) || 1;
+			if (value < 2) this.value = 2;
+			if (value <= startZone) {
+				document.getElementById('penaltyStartZoneInput').value = Math.max(1, value - 1);
+			}
+		});
+		
+		document.getElementById('coefficientInput').addEventListener('input', function() {
+			const value = parseFloat(this.value);
+			if (value < 0.01) this.value = 0.01;
+		});
+		
+		document.getElementById('costInput').addEventListener('input', function() {
+			const value = parseFloat(this.value);
+			if (value < 1) this.value = 1;
+		});
+		
+		document.getElementById('toggleCostSettingsButton').addEventListener('click', () => {
+			const settingsGroup = document.getElementById('costSettingsGroup');
+			const button = document.getElementById('toggleCostSettingsButton');
+			if (settingsGroup.style.display === 'none') {
+				settingsGroup.style.display = 'block';
+				button.textContent = 'Скрыть настройки стоимости';
+			} else {
+				settingsGroup.style.display = 'none';
+				button.textContent = 'Показать настройки стоимости';
+			}
+		});
+
+		document.getElementById('togglePreviewButton').addEventListener('click', () => {
+			const previewDiv = document.getElementById('penaltyPreview');
+			if (previewDiv.style.display === 'none') {
+				previewDiv.style.display = 'block';
+				updatePenaltyPreview();
+			} else {
+				previewDiv.style.display = 'none';
+			}
+		});
+	</script>
+	<script>
+function applyStreamlitStyles() {
+    const isDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+
+    const colors = {
+        light: {
+            bg: '#ffffff',
+            text: '#31333f',
+            border: '#e0e0e0',
+            primary: '#ff4b4b',
+            secondary: '#f0f2f6',
+            hover: '#e63946'
+        },
+        dark: {
+            bg: '#0e1117',
+            text: '#fafafa',
+            border: '#4f4f4f',
+            primary: '#ff6b6b',
+            secondary: '#262730',
+            hover: '#ff8787'
+        }
+    };
+
+    const theme = isDark ? colors.dark : colors.light;
+    document.body.style.fontFamily = '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+    document.body.style.backgroundColor = theme.bg;
+    document.body.style.color = theme.text;
+
+    const headings = document.querySelectorAll('h1');
+    headings.forEach(h => {
+        h.style.color = theme.text;
+        h.style.fontWeight = '600';
+        h.style.marginBottom = '1rem';
+    });
+
+    const labels = document.querySelectorAll('label');
+    labels.forEach(label => {
+        label.style.color = theme.text;
+        label.style.fontWeight = '500';
+        label.style.marginBottom = '0.5rem';
+        label.style.display = 'inline-block';
+        label.style.minWidth = '220px';
+    });
+
+    const inputs = document.querySelectorAll('input[type="file"], input[type="number"]');
+    inputs.forEach(input => {
+        input.style.backgroundColor = theme.secondary;
+        input.style.border = `1px solid ${theme.border}`;
+        input.style.borderRadius = '0.25rem';
+        input.style.color = theme.text;
+        input.style.padding = '0.5rem';
+        input.style.marginBottom = '1rem';
+        input.style.width = '100%';
+        input.style.maxWidth = '400px';
+        input.style.fontFamily = 'inherit';
+    });
+
+    const buttons = document.querySelectorAll('button');
+    buttons.forEach(button => {
+        button.style.backgroundColor = theme.primary;
+        button.style.color = 'white';
+        button.style.border = 'none';
+        button.style.borderRadius = '0.25rem';
+        button.style.padding = '0.5rem 1rem';
+        button.style.cursor = 'pointer';
+        button.style.fontWeight = '500';
+        button.style.fontFamily = 'inherit';
+        button.style.transition = 'background-color 0.2s';
+
+        button.onmouseover = () => button.style.backgroundColor = theme.hover;
+        button.onmouseout = () => button.style.backgroundColor = theme.primary;
+    });
+
+    const groups = document.querySelectorAll('.group');
+    groups.forEach(group => {
+        group.style.border = `1px solid ${theme.border}`;
+        group.style.padding = '1rem';
+        group.style.borderRadius = '0.5rem';
+        group.style.margin = '1rem 0';
+        group.style.backgroundColor = theme.secondary;
+    });
+
+    const mapElement = document.getElementById('map');
+    if (mapElement) {
+        mapElement.style.border = `1px solid ${theme.border}`;
+        mapElement.style.borderRadius = '0.5rem';
+        mapElement.style.margin = '1rem 0';
+    }
+
+    const smallButtons = document.querySelectorAll('button.small');
+    smallButtons.forEach(button => {
+        button.style.padding = '2px 8px';
+        button.style.marginLeft = '8px';
+        button.style.fontSize = '0.875rem';
+    });
+
+    const badges = document.querySelectorAll('.badge');
+    badges.forEach(badge => {
+        badge.style.display = 'inline-block';
+        badge.style.padding = '2px 8px';
+        badge.style.borderRadius = '10px';
+        badge.style.background = '#eef';
+        badge.style.margin = '2px 4px 2px 0';
+    });
+}
+
+applyStreamlitStyles();
+if (window.matchMedia) {
+    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', applyStreamlitStyles);
+}
+	</script>
+</body>
+</html>
+
+

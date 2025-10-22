@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Оптимизатор GeoJSON</title>
+    <!-- Подключаем библиотеку Turf.js для работы с географическими данными -->
+    <script src="https://cdn.jsdelivr.net/npm/@turf/turf@6.5.0/turf.min.js"></script>
+</head>
+<body>
+    <h1>Оптимизатор GeoJSON</h1>
+    <!-- Элемент для выбора файла -->
+    <input type="file" id="geojsonFile" accept=".geojson">
+    <br><br>
+    <!-- Ползунок для регулировки tolerance -->
+    <label for="toleranceRange">Уровень оптимизации (tolerance):</label>
+    <input type="range" id="toleranceRange" min="0" max="0.05" step="0.0001" value="0.001">
+    <span id="toleranceValue">0.001</span>
+    <br><br>
+    <!-- Кнопка для запуска оптимизации -->
+    <button id="optimizeButton">Оптимизировать</button>
+    <br><br>
+    <!-- Ссылка для скачивания оптимизированного файла -->
+    <a id="downloadLink" href="#" style="display:none;">Скачать оптимизированный файл</a>
+
+    <script>
+        // Обновляем отображение значения tolerance при перемещении ползунка
+        const toleranceRange = document.getElementById('toleranceRange');
+        const toleranceValue = document.getElementById('toleranceValue');
+        toleranceRange.addEventListener('input', function() {
+            toleranceValue.textContent = toleranceRange.value;
+        });
+
+        // Обработчик события для кнопки "Оптимизировать"
+        document.getElementById('optimizeButton').addEventListener('click', function() {
+            const fileInput = document.getElementById('geojsonFile');
+            if (fileInput.files.length === 0) {
+                alert('Пожалуйста, выберите файл.');
+                return;
+            }
+
+            const file = fileInput.files[0];
+            const reader = new FileReader();
+
+            reader.onload = function(e) {
+                try {
+                    const geojson = JSON.parse(e.target.result);
+                    // Получаем значение tolerance из ползунка
+                    const tolerance = parseFloat(document.getElementById('toleranceRange').value);
+                    // Настройки для функции simplify
+                    const options = { tolerance: tolerance, highQuality: true };
+                    // Оптимизация геометрии
+                    const simplified = turf.simplify(geojson, options);
+
+                    const simplifiedData = JSON.stringify(simplified);
+                    const blob = new Blob([simplifiedData], { type: 'application/json' });
+                    const url = URL.createObjectURL(blob);
+
+                    const downloadLink = document.getElementById('downloadLink');
+                    downloadLink.href = url;
+                    downloadLink.download = 'simplified.geojson';
+                    downloadLink.style.display = 'inline';
+                    downloadLink.textContent = 'Скачать оптимизированный файл';
+                } catch (err) {
+                    alert('Ошибка при обработке файла: ' + err.message);
+                }
+            };
+
+            reader.readAsText(file);
+        });
+    </script>
+</body>
+</html>

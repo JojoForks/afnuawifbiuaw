@@ -1,0 +1,1686 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Редактор Зон на Яндекс.Картах с Примагничиванием и Обрезкой</title>
+    <style>
+        /* Стили */
+        #map {
+            width: 100%;
+            height: 500px;
+        }
+        #controls {
+            margin: 10px 0;
+        }
+        #polygon-list {
+            max-height: 200px;
+            overflow-y: auto;
+            border: 1px solid #ccc;
+            padding: 10px;
+        }
+        .polygon-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 5px;
+        }
+        .polygon-item input[type="text"] {
+            flex: 1;
+            margin-right: 10px;
+        }
+        .color-picker {
+            width: 30px;
+            height: 30px;
+            border: none;
+            cursor: pointer;
+            padding: 0;
+        }
+        .delete-button {
+            background-color: #e74c3c;
+            border: none;
+            color: white;
+            padding: 5px 10px;
+            cursor: pointer;
+            margin-left: 5px;
+        }
+        .delete-button:hover {
+            background-color: #c0392b;
+        }
+        .error {
+            color: red;
+            margin-top: 5px;
+        }
+        #load-geojson-btn, #export-geojson-btn {
+            background-color: #4CAF50;
+            border: none;
+            color: white;
+            padding: 5px 10px;
+            cursor: pointer;
+            margin-right: 5px;
+        }
+        #load-geojson-btn:hover, #export-geojson-btn:hover {
+            background-color: #45a049;
+        }
+        #geojson-file-input {
+            margin-bottom: 5px;
+        }
+    </style>
+    <!-- Подключаем API Яндекс.Карт -->
+    <script src="https://api-maps.yandex.ru/2.1/?lang=ru_RU" type="text/javascript"></script>
+    <!-- Подключаем Turf.js -->
+    <script src="https://cdn.jsdelivr.net/npm/@turf/turf@6/turf.min.js"></script>
+</head>
+<body>
+
+<div id="controls">
+    <button id="create-polygon-btn">Создать полигон</button>
+    <button id="save-polygon-btn" disabled>Сохранить</button>
+    <button id="cancel-polygon-btn" disabled>Отмена</button>
+    <!-- Кнопка для примагничивания и обрезки полигонов -->
+    <button id="process-polygons-btn">Примагнитить полигоны</button>
+	<!-- Слайдер для управления maxSnapDistance --><br>
+	<label for="snap-distance-slider">Дистанция примагничивания (м): <span id="snap-distance-value">1500</span></label><br>
+	<input type="range" id="snap-distance-slider" min="0" max="5000" step="10" value="1500">
+
+    <!-- Элементы для загрузки и выгрузки GeoJSON -->
+    <div style="margin-top: 10px;">
+        <input type="file" id="geojson-file-input" accept=".json,.geojson" style="margin-right: 10px;">
+        <button id="load-geojson-btn">Загрузить GeoJSON</button>
+        <button id="export-geojson-btn">Выгрузить GeoJSON</button>
+    </div>
+
+    <!-- Элемент для отображения ошибок -->
+    <div id="error-message" class="error"></div>
+</div>
+<div id="map"></div>
+<h3>Список Полигонов:</h3>
+<div id="polygon-list"></div>
+
+<script>
+ymaps.ready(init);
+
+let map;
+let polygonEditor = null;
+let polygons = [];
+let isCreating = false;
+let currentPolygon = null;
+let originalCoordinates = null; // Для хранения исходных координат при редактировании
+let polygonIdCounter = 1; // Счётчик уникальных ID для полигонов
+let maxSnapDistance = 1500; // Максимальное расстояние для примагничивания в метрах
+let originalPolygonsCoordinates = []; // Для хранения исходных координат полигонов при предварительном просмотре
+let isPreviewing = false; // Флаг, указывающий на то, что сейчас идет предварительный просмотр
+let mergeTolerance = 0; // 0 — без допусков объединения по умолчанию
+let gapCloseMax = 0; // 0 — не использовать принудительное закрытие зазоров по умолчанию
+let gapMaxArea = 20000; // Порог площади зазора (используется только если gapCloseMax > 0)
+// Ограничители производительности
+const SNAP_OPS_LIMIT = 1000000; // максимум проверок отрезков при примагничивании
+const GAP_TIME_BUDGET_MS = 3000; // бюджет времени (мс) на закрытие зазоров
+const GAP_MAX_GAPS = 3000; // максимум зазоров для обработки за один прогон
+const GAP_MAX_FEATURES_FOR_UNION = 1000; // если полигонов слишком много — пропускаем тяжёлый union
+
+function init() {
+    map = new ymaps.Map("map", {
+        center: [55.76, 37.64], // Москва
+        zoom: 10
+    });
+
+    document.getElementById('create-polygon-btn').addEventListener('click', startCreatingPolygon);
+    document.getElementById('save-polygon-btn').addEventListener('click', savePolygon);
+    document.getElementById('cancel-polygon-btn').addEventListener('click', cancelPolygon);
+    // Обработчик для кнопки примагничивания и обрезки
+    document.getElementById('process-polygons-btn').addEventListener('click', processPolygons);
+
+    // Обработчики для загрузки и выгрузки GeoJSON
+    document.getElementById('load-geojson-btn').addEventListener('click', loadGeoJSONFile);
+    document.getElementById('export-geojson-btn').addEventListener('click', exportGeoJSONFile);
+
+    const snapSlider = document.getElementById('snap-distance-slider');
+
+    // Обработчик нажатия мыши на слайдере (предпросмотр отключен)
+    snapSlider.addEventListener('mousedown', function () {});
+
+    // Обработчик перемещения мыши (изменение значения слайдера) — только меняем значение
+    snapSlider.addEventListener('input', function () {
+        const newValue = parseInt(this.value);
+        document.getElementById('snap-distance-value').textContent = newValue;
+        maxSnapDistance = newValue;
+    });
+
+    // Обработчик отпускания мыши на слайдере (ничего не делаем)
+    snapSlider.addEventListener('mouseup', function () {});
+
+    // Для случая, когда пользователь использует клавиатуру для управления слайдером
+    snapSlider.addEventListener('change', function () {
+        document.getElementById('snap-distance-value').textContent = this.value;
+        maxSnapDistance = parseInt(this.value);
+    });
+
+    // Добавим глобальный обработчик клика на карту, чтобы отменить редактирование при клике вне полигона
+    map.events.add('click', function (e) {
+        if (isCreating && (polygonEditor || currentPolygon)) {
+            // Не делаем ничего, пока идёт создание или редактирование полигона
+            return;
+        }
+        // Можно добавить логику для отмены редактирования при клике вне полигона, если необходимо
+    });
+
+    // Пример использования функции импорта после инициализации карты
+    // Вы можете удалить или изменить этот пример по своему усмотрению
+    /*
+    const sampleGeoJSON = {
+        "type": "FeatureCollection",
+        "features": [
+            {
+                "type": "Feature",
+                "id": 14,
+                "geometry": {
+                    "type": "Polygon",
+                    "coordinates": [
+                        [
+                            [37.60, 55.75],
+                            [37.61, 55.75],
+                            [37.61, 55.76],
+                            [37.60, 55.76],
+                            [37.60, 55.75]
+                        ]
+                    ]
+                },
+                "properties": {
+                    "description": "Импортированный полигон 1",
+                    "fill": "#ed4543",
+                    "fill-opacity": 0.6,
+                    "stroke": "#ed4543",
+                    "stroke-width": 0.5,
+                    "stroke-opacity": 0.9
+                }
+            }
+        ]
+    };
+
+    importPolygonsFromGeoJSON(sampleGeoJSON);
+    */
+}
+
+function saveOriginalCoordinates() {
+    originalPolygonsCoordinates = []; // Очищаем предыдущие данные
+    polygons.forEach(polygon => {
+        if (polygon.geoObject) {
+            originalPolygonsCoordinates.push({
+                id: polygon.id,
+                coordinates: JSON.parse(JSON.stringify(polygon.geoObject.geometry.getCoordinates()))
+            });
+        }
+    });
+    console.log("Исходные координаты полигонов сохранены для предварительного просмотра.");
+}
+
+function restoreOriginalCoordinates() {
+    if (originalPolygonsCoordinates.length > 0) {
+        polygons.forEach(polygon => {
+            const original = originalPolygonsCoordinates.find(op => op.id === polygon.id);
+            if (original && polygon.geoObject) {
+                polygon.geoObject.geometry.setCoordinates(original.coordinates);
+            }
+        });
+        console.log("Исходные координаты полигонов восстановлены после предварительного просмотра.");
+    }
+}
+
+function startCreatingPolygon() {
+    if (isCreating) {
+        alert("Сейчас идёт создание или редактирование полигона. Пожалуйста, завершите его прежде чем создавать новый.");
+        return;
+    }
+
+    console.log("Начало создания нового полигона.");
+    isCreating = true;
+    currentPolygon = null;
+    document.getElementById('save-polygon-btn').disabled = false;
+    document.getElementById('cancel-polygon-btn').disabled = false;
+    document.getElementById('create-polygon-btn').disabled = true;
+    document.getElementById('error-message').textContent = ''; // Очистка сообщения об ошибке
+
+    // Деактивируем редактирование и изменяем цвет существующих полигонов на серый
+    polygons.forEach(p => {
+        if (p.geoObject) {
+            p.geoObject.options.set('fillColor', p.color + 'AA'); // Серый с прозрачностью
+            if (p.geoObject.editor) {
+                p.geoObject.editor.stopEditing();
+            }
+            p.geoObject.options.set('draggable', false);
+        }
+    });
+
+    // Создаем новый полигон для редактирования
+    polygonEditor = new ymaps.Polygon([], {}, {
+        fillColor: '#00FF00AA',
+        strokeColor: '#0000FF',
+        strokeWidth: 2,
+        editorDrawingCursor: "crosshair",
+        editorMaxPoints: 100,
+        draggable: false // Полигоны не перетаскиваются по умолчанию
+    });
+
+    map.geoObjects.add(polygonEditor);
+
+    // Начинаем рисование полигона
+    polygonEditor.editor.startDrawing();
+
+    // Используем событие 'drawingstop' для определения окончания рисования
+    polygonEditor.editor.events.add('drawingstop', function () {
+        console.log("Завершено рисование полигона.");
+        // После окончания рисования делаем полигон перетаскиваемым
+        polygonEditor.options.set('draggable', true);
+        polygonEditor.editor.startEditing(); // Включаем редактирование вершин
+
+        // Добавляем обработчик изменения геометрии для проверки самопересечения
+        polygonEditor.editor.events.add('geometrychange', function () {
+            validatePolygon(polygonEditor);
+        });
+
+        // Выполняем начальную проверку
+        validatePolygon(polygonEditor);
+    });
+
+    // Инструкции пользователю
+    alert("Кликните по карте, чтобы добавить вершины полигона. Дважды кликните для завершения. Затем вы можете перемещать и редактировать полигон перед сохранением.");
+}
+
+function savePolygon() {
+    if (!isCreating) return;
+
+    if (polygonEditor) {
+        // Проверяем валидность полигона (отсутствие самопересечений и минимум три уникальные точки)
+        if (!isPolygonValid(polygonEditor)) {
+            alert("Полигон должен иметь минимум три уникальные точки и не содержать самопересечений.");
+            // Активируем редактирование снова для исправления
+            polygonEditor.editor.startEditing();
+            isCreating = true;
+            document.getElementById('save-polygon-btn').disabled = false;
+            document.getElementById('cancel-polygon-btn').disabled = false;
+            document.getElementById('create-polygon-btn').disabled = true;
+            return;
+        }
+
+        // Завершаем создание нового полигона
+        if (polygonEditor.editor) {
+            polygonEditor.editor.stopEditing();
+        }
+        console.log("Завершение создания нового полигона.");
+        isCreating = false;
+        document.getElementById('save-polygon-btn').disabled = true;
+        document.getElementById('cancel-polygon-btn').disabled = true;
+        document.getElementById('create-polygon-btn').disabled = false;
+        document.getElementById('error-message').textContent = ''; // Очистка сообщения об ошибке
+
+        // Проверяем, есть ли достаточное количество точек
+        const coords = polygonEditor.geometry.getCoordinates();
+        if (coords.length < 1 || coords[0].length < 4) { // Минимум 4 точки (3 уникальные + замыкание)
+            alert("Полигон должен иметь как минимум три уникальные точки.");
+            map.geoObjects.remove(polygonEditor);
+            polygonEditor = null;
+            return;
+        }
+
+        // Присваиваем уникальное название
+        const defaultName = `Полигон ${polygonIdCounter}`;
+        const color = getRandomColor();
+
+        // Обновляем стиль нового полигона
+        polygonEditor.options.set({
+            fillColor: color + 'AA',
+            strokeColor: color,
+            strokeWidth: 0.5,
+            editorEnabled: false,
+            draggable: false
+        });
+
+        // Добавляем новый полигон в список
+        const newPolygon = {
+            id: polygonIdCounter++, // Присваиваем уникальный ID
+            name: defaultName,
+            color: color,
+            geoObject: polygonEditor,
+            dragendHandler: null
+        };
+        newPolygon.geoObject.properties.set('name', defaultName);
+
+        polygons.push(newPolygon);
+
+        addPolygonToList(newPolygon);
+
+        // Добавляем событие клика на полигон для входа в режим редактирования
+        polygonEditor.events.add('click', function (e) {
+            e.stopPropagation();
+            enterEditMode(newPolygon);
+        });
+
+        // Сбрасываем переменную для следующего полигона
+        polygonEditor = null;
+
+        // После сохранения, не вызываем processPolygons()
+        // Эта функция будет вызвана только по нажатию на кнопку "Примагнитить полигоны"
+    } else if (currentPolygon) {
+        // Проверяем валидность полигона (отсутствие самопересечений и минимум три уникальные точки)
+        if (!isPolygonValid(currentPolygon.geoObject)) {
+            alert("Полигон должен иметь минимум три уникальные точки и не содержать самопересечений.");
+            // Активируем редактирование снова для исправления
+            currentPolygon.geoObject.editor.startEditing();
+            isCreating = true;
+            document.getElementById('save-polygon-btn').disabled = false;
+            document.getElementById('cancel-polygon-btn').disabled = false;
+            document.getElementById('create-polygon-btn').disabled = true;
+            return;
+        }
+
+        // Завершаем редактирование существующего полигона
+        if (currentPolygon.geoObject.editor) {
+            currentPolygon.geoObject.editor.stopEditing();
+        }
+        currentPolygon.geoObject.options.set('draggable', false);
+        // Удаляем обработчик dragend
+        if (currentPolygon.dragendHandler) {
+            currentPolygon.geoObject.events.remove('dragend', currentPolygon.dragendHandler);
+            currentPolygon.dragendHandler = null;
+        }
+
+        console.log(`Завершено редактирование полигона "${currentPolygon.name}".`);
+        isCreating = false;
+        currentPolygon = null;
+        originalCoordinates = null;
+        document.getElementById('save-polygon-btn').disabled = true;
+        document.getElementById('cancel-polygon-btn').disabled = true;
+        document.getElementById('create-polygon-btn').disabled = false;
+        document.getElementById('error-message').textContent = ''; // Очистка сообщения об ошибке
+
+        // Возвращаем цвет остальных полигонов
+        polygons.forEach(p => {
+            if (p.geoObject) {
+                p.geoObject.options.set('fillColor', p.color + 'AA');
+            }
+        });
+
+        // После сохранения, не вызываем processPolygons()
+        // Эта функция будет вызвана только по нажатию на кнопку "Примагнитить полигоны"
+    } else {
+        console.error("Neither polygonEditor nor currentPolygon is set.");
+    }
+
+    // Очищаем сохраненные координаты предварительного просмотра после сохранения полигона
+    originalPolygonsCoordinates = [];
+}
+
+function cancelPolygon() {
+    if (!isCreating) return;
+
+    // Восстанавливаем исходные координаты при отмене
+    restoreOriginalCoordinates();
+
+    if (polygonEditor) {
+        // Отменяем создание нового полигона
+        console.log("Отмена создания нового полигона.");
+        map.geoObjects.remove(polygonEditor);
+        polygonEditor = null;
+    } else if (currentPolygon) {
+        // Откатываем изменения полигона
+        console.log(`Отмена редактирования полигона "${currentPolygon.name}".`);
+        if (originalCoordinates) {
+            currentPolygon.geoObject.geometry.setCoordinates(originalCoordinates);
+        }
+        if (currentPolygon.geoObject.editor) {
+            currentPolygon.geoObject.editor.stopEditing();
+        }
+        currentPolygon.geoObject.options.set('draggable', false);
+        // Удаляем обработчик dragend
+        if (currentPolygon.dragendHandler) {
+            currentPolygon.geoObject.events.remove('dragend', currentPolygon.dragendHandler);
+            currentPolygon.dragendHandler = null;
+        }
+        originalCoordinates = null;
+    }
+
+    isCreating = false;
+    currentPolygon = null;
+    document.getElementById('save-polygon-btn').disabled = true;
+    document.getElementById('cancel-polygon-btn').disabled = true;
+    document.getElementById('create-polygon-btn').disabled = false;
+
+    // Возвращаем цвет остальных полигонов
+    polygons.forEach(p => {
+        if (p.geoObject) {
+            p.geoObject.options.set('fillColor', p.color + 'AA');
+        }
+    });
+
+    // Очистка сообщения об ошибке
+    document.getElementById('error-message').textContent = '';
+
+    // Очищаем сохраненные координаты предварительного просмотра
+    originalPolygonsCoordinates = [];
+}
+
+function addPolygonToList(polygon) {
+    const list = document.getElementById('polygon-list');
+
+    const item = document.createElement('div');
+    item.className = 'polygon-item';
+    item.dataset.polygonId = polygon.id; // Сохраняем ID в атрибуте данных
+
+    // Поле для названия полигона
+    const nameInput = document.createElement('input');
+    nameInput.type = 'text';
+    nameInput.value = polygon.name;
+    nameInput.addEventListener('change', () => {
+        polygon.geoObject.properties.set('name', nameInput.value);
+        polygon.name = nameInput.value; // Обновляем имя в объекте полигона
+        console.log(`Название полигона изменено на "${polygon.name}".`);
+    });
+
+    // Поле для выбора цвета
+    const colorInput = document.createElement('input');
+    colorInput.type = 'color';
+    colorInput.value = polygon.color;
+    colorInput.className = 'color-picker';
+    colorInput.addEventListener('input', () => {
+        polygon.color = colorInput.value;
+        polygon.geoObject.options.set({
+            fillColor: polygon.color + 'AA',
+            strokeColor: polygon.color
+        });
+        console.log(`Цвет полигона "${polygon.name}" изменён на ${polygon.color}.`);
+    });
+
+    // Кнопка удаления полигона
+    const deleteBtn = document.createElement('button');
+    deleteBtn.textContent = 'Удалить';
+    deleteBtn.className = 'delete-button';
+    deleteBtn.addEventListener('click', () => {
+        if (confirm(`Удалить ${polygon.name}?`)) {
+            console.log(`Удаление полигона "${polygon.name}".`);
+            // Удаляем полигон
+            removePolygon(polygon);
+        }
+    });
+
+    // Добавляем элементы в контейнер списка
+    item.appendChild(nameInput);
+    item.appendChild(colorInput);
+    item.appendChild(deleteBtn);
+
+    list.appendChild(item);
+    console.log(`Полигон "${polygon.name}" добавлен в список.`);
+}
+
+function getRandomColor() {
+    const letters = '0123456789ABCDEF';
+    let color = '#';
+    for (let i = 0; i < 6; i++) {
+        color += letters[Math.floor(Math.random() * 16)];
+    }
+    return color;
+}
+
+// Функция для входа в режим редактирования при клике на полигон
+function enterEditMode(polygon) {
+    if (isCreating) {
+        alert("Сначала завершите текущее создание или редактирование полигона.");
+        return;
+    }
+    console.log(`Вход в режим редактирования полигона "${polygon.name}".`);
+    isCreating = true;
+    currentPolygon = polygon;
+    originalCoordinates = polygon.geoObject.geometry.getCoordinates(); // Сохраняем исходные координаты
+    document.getElementById('save-polygon-btn').disabled = false;
+    document.getElementById('cancel-polygon-btn').disabled = false;
+    document.getElementById('create-polygon-btn').disabled = true;
+    document.getElementById('error-message').textContent = ''; // Очистка сообщения об ошибке
+
+    // Деактивируем редактирование других полигонов
+    polygons.forEach(p => {
+        if (p.id !== polygon.id && p.geoObject) {
+            p.geoObject.options.set('fillColor', p.color + 'AA');
+            if (p.geoObject.editor) {
+                p.geoObject.editor.stopEditing();
+            }
+            p.geoObject.options.set('draggable', false);
+        }
+    });
+
+    // Активируем редактирование для выбранного полигона
+    if (polygon.geoObject.editor) {
+        polygon.geoObject.editor.startEditing();
+    } else {
+        polygon.geoObject.editor = new ymaps.geometryEditor.Polygon(polygon.geoObject);
+        polygon.geoObject.editor.startEditing();
+    }
+    polygon.geoObject.options.set('draggable', true);
+
+    // Добавляем обработчик события dragend
+    if (polygon.dragendHandler) {
+        polygon.geoObject.events.remove('dragend', polygon.dragendHandler);
+    }
+    polygon.dragendHandler = function (e) {
+        updatePolygonCoordinates(e.get('target'));
+    };
+    polygon.geoObject.events.add('dragend', polygon.dragendHandler);
+
+    // Добавляем обработчик изменения геометрии для проверки самопересечения
+    polygon.geoObject.editor.events.add('geometrychange', function () {
+        validatePolygon(polygon.geoObject);
+    });
+
+    // Выполняем начальную проверку
+    validatePolygon(polygon.geoObject);
+
+    // Изменяем цвет редактируемого полигона
+    polygon.geoObject.options.set('fillColor', '#00FF00AA');
+
+    alert("Редактирование полигона активно. Измените форму или переместите полигон. Нажмите 'Сохранить' для сохранения изменений или 'Отмена' для отмены.");
+}
+
+// Функция для обновления координат полигона после перетаскивания
+function updatePolygonCoordinates(polygon) {
+    if (!polygon || !polygon.geometry) {
+        console.error("Polygon is null or has no geometry");
+        return;
+    }
+
+    const newCoordinates = polygon.geometry.getCoordinates();
+    const polygonName = polygon.properties.get('name') || 'Без имени'; // Получаем имя полигона
+
+    // Здесь можно обновить данные в вашем хранилище или отправить на сервер
+    console.log(`Координаты полигона "${polygonName}" обновлены. Новые координаты:`, newCoordinates);
+}
+
+// Функция для преобразования координат Яндекс.Карт в формат GeoJSON с реверсированием
+function toGeoJSON(geoObject, id) {
+    const geometry = geoObject.geometry;
+    const coords = geometry.getCoordinates();
+    const type = geometry.getType();
+    const name = geoObject.properties.get('name') || `Полигон ${id}`;
+    const fillColor = geoObject.options.get('fillColor') || '#ed4543AA'; // Default color with opacity
+    const strokeColor = geoObject.options.get('strokeColor') || '#ed4543';
+    const strokeWidth = 0.5;
+
+    // Извлекаем прозрачность из fillColor
+    let fillOpacity = 1.0;
+    let fillColorHex = fillColor;
+    if (fillColor.length === 9) { // Формат: #RRGGBBAA
+        const opacityHex = fillColor.slice(7, 9);
+        fillOpacity = parseInt(opacityHex, 16) / 255;
+        fillColorHex = fillColor.slice(0, 7);
+    } else if (fillColor.length === 7) { // Формат: #RRGGBB
+        fillColorHex = fillColor;
+        fillOpacity = 1.0;
+    }
+
+    let strokeOpacity = 1.0; // Предполагаем полную непрозрачность
+
+    let reversedCoords;
+
+    if (type === 'Polygon') {
+        reversedCoords = coords.map(ring => reverseCoordinates(ring));
+    } else if (type === 'MultiPolygon') {
+        reversedCoords = coords.map(polygon => {
+            return polygon.map(ring => reverseCoordinates(ring));
+        });
+    } else {
+        console.error('Unsupported geometry type:', type);
+        return null;
+    }
+
+    const geojson = {
+        type: 'Feature',
+        id: id,
+        geometry: {
+            type: type,
+            coordinates: reversedCoords
+        },
+        properties: {
+            description: name,
+            fill: fillColorHex,
+            'fill-opacity': fillOpacity,
+            stroke: strokeColor,
+            'stroke-width': strokeWidth,
+            'stroke-opacity': strokeOpacity
+        }
+    };
+
+    return geojson;
+}
+
+// Функция для удаления полигона
+function removePolygon(polygon) {
+    console.log(`Удаление полигона "${polygon.name}" (ID: ${polygon.id}).`);
+    // Удаляем с карты
+    map.geoObjects.remove(polygon.geoObject);
+    // Удаляем из массива polygons
+    polygons = polygons.filter(p => p.id !== polygon.id);
+    // Удаляем из списка на странице
+    removePolygonFromList(polygon);
+    console.log(`Полигон "${polygon.name}" удалён из списка.`);
+
+    // Очищаем сохраненные координаты предварительного просмотра
+    originalPolygonsCoordinates = [];
+}
+
+// Функция для удаления полигона из списка
+function removePolygonFromList(polygon) {
+    const list = document.getElementById('polygon-list');
+    const items = list.getElementsByClassName('polygon-item');
+    for (let item of items) {
+        if (parseInt(item.dataset.polygonId) === polygon.id) {
+            list.removeChild(item);
+            console.log(`Полигон "${polygon.name}" удалён из DOM списка.`);
+            break;
+        }
+    }
+}
+
+// Функция для проверки валидности полигона (отсутствие самопересечений и минимум три уникальные точки)
+function isPolygonValid(polygon) {
+    const geojson = toGeoJSON(polygon);
+    if (!geojson) return false;
+
+    // Проверка на самопересечения
+    try {
+        const selfIntersections = turf.kinks(geojson);
+        if (selfIntersections.features.length > 0) {
+            return false;
+        }
+    } catch (error) {
+        console.error("Ошибка при проверке самопересечений:", error);
+        return false;
+    }
+
+    // Проверка на минимум три уникальные точки
+    const outerRing = geojson.geometry.coordinates[0];
+    const uniquePoints = new Set(outerRing.map(pt => pt.join(',')));
+    if (uniquePoints.size < 3) {
+        return false;
+    }
+
+    return true;
+}
+
+// Функция для валидации полигона и отображения ошибок
+function validatePolygon(polygon) {
+    const errorMessage = document.getElementById('error-message');
+    if (!isPolygonValid(polygon)) {
+        errorMessage.textContent = "Полигон должен иметь минимум три уникальные точки и не содержать самопересечений.";
+        document.getElementById('save-polygon-btn').disabled = true;
+    } else {
+        errorMessage.textContent = "";
+        document.getElementById('save-polygon-btn').disabled = false;
+    }
+}
+
+// Функция для примагничивания и обрезки полигонов
+function processPolygons() {
+    console.log("Начало окончательного примагничивания полигонов.");
+    // Перед окончательным примагничиванием сохраняем исходные координаты
+    saveOriginalCoordinates();
+
+    // Вставляем недостающие вершины по близким рёбрам, чтобы боковые грани совпали
+    try {
+        densifyEdges(maxSnapDistance);
+    } catch (e) {
+        console.warn('densifyEdges error:', e);
+    }
+
+    snapVertices(); // Окончательное примагничивание без параметра isPreview
+
+    // ОТКЛЮЧЕНО: сшивание границ ломает геометрию — закомментировано
+    // try {
+    //     stitchBoundaries(maxSnapDistance);
+    // } catch (e) {
+    //     console.warn('stitchBoundaries error:', e);
+    // }
+
+    trimNewPolygons();
+
+    // Принудительное закрытие зазоров: включаем по умолчанию с агрессивными настройками
+    try {
+        fillGapsBetweenPolygonsAggressive(maxSnapDistance);
+    } catch (e) {
+        console.warn('fillGapsBetweenPolygonsAggressive error:', e);
+    }
+
+    // После окончательного примагничивания очищаем сохраненные координаты
+    originalPolygonsCoordinates = [];
+    console.log("Окончательное примагничивание полигонов завершено.");
+}
+
+function previewSnap() {
+    console.log("Предварительный просмотр примагничивания с дистанцией:", maxSnapDistance);
+
+    // Восстанавливаем исходные координаты перед применением нового примагничивания
+    restoreOriginalCoordinates();
+
+    // Применяем примагничивание для предварительного просмотра
+    snapVertices(true); // Передаем true, чтобы указать, что это предварительный просмотр
+}
+
+// Функция для примагничивания полигонов
+function snapVertices(isPreview = false) {
+    console.log("Начало примагничивания вершин полигонов.");
+
+    // Если это окончательное примагничивание, очищаем сохраненные координаты
+    if (!isPreview) {
+        originalPolygonsCoordinates = [];
+    }
+
+    let ops = 0;
+    let opsLimitReached = false;
+
+    for (let i = 0; i < polygons.length; i++) {
+        const poly1 = polygons[i];
+        if (!poly1 || !poly1.geoObject) continue;
+
+        // Клонируем координаты полигона
+        const coords1 = JSON.parse(JSON.stringify(poly1.geoObject.geometry.getCoordinates()));
+
+        // Проходим по каждому кольцу полигона
+        for (let ringIndex1 = 0; ringIndex1 < coords1.length; ringIndex1++) {
+            const ring1 = coords1[ringIndex1];
+            if (!Array.isArray(ring1) || ring1.length < 2) continue;
+
+            // Проверяем, замкнуто ли кольцо
+            const isClosed = ring1.length > 0 && ring1[0][0] === ring1[ring1.length - 1][0] && ring1[0][1] === ring1[ring1.length - 1][1];
+            const lastEditableIndex = isClosed ? ring1.length - 1 : ring1.length;
+
+            // Проходим по каждой вершине кольца, не перемещая замыкающую вершину
+            for (let vertexIndex1 = 0; vertexIndex1 < lastEditableIndex; vertexIndex1++) {
+                const vertex1 = ring1[vertexIndex1];
+
+                let bestDistance = Infinity;
+                let bestPoint = null;
+
+                // Сравниваем с другими полигонами
+                for (let j = 0; j < polygons.length; j++) {
+                    if (i === j) continue;
+                    const poly2 = polygons[j];
+                    if (!poly2 || !poly2.geoObject) continue;
+
+                    // Получаем координаты второго полигона
+                    const coords2 = poly2.geoObject.geometry.getCoordinates();
+
+                    // Проходим по каждому кольцу второго полигона
+                    for (let ringIndex2 = 0; ringIndex2 < coords2.length; ringIndex2++) {
+                        const ring2 = coords2[ringIndex2];
+                        if (!Array.isArray(ring2) || ring2.length < 2) continue;
+
+                        // Проходим по каждому сегменту второго полигона
+                        for (let k = 0; k < ring2.length - 1; k++) {
+                            const pointA = ring2[k];
+                            const pointB = ring2[k + 1];
+
+                            // Вычисляем расстояние до сегмента
+                            const distanceData = pointToSegmentDistance(vertex1, pointA, pointB);
+                            if (distanceData.distance < bestDistance) {
+                                bestDistance = distanceData.distance;
+                                bestPoint = distanceData.closestPoint;
+                            }
+
+                            ops++;
+                            if (ops >= SNAP_OPS_LIMIT) { opsLimitReached = true; break; }
+                        }
+                        if (opsLimitReached) break;
+                    }
+                    if (opsLimitReached) break;
+                }
+
+                if (bestPoint && bestDistance <= maxSnapDistance) {
+                    ring1[vertexIndex1] = bestPoint;
+                }
+                if (opsLimitReached) break;
+            }
+
+            // Восстанавливаем замыкание кольца
+            if (isClosed) {
+                ring1[ring1.length - 1] = ring1[0];
+            } else if (ring1.length >= 1) {
+                // На случай незамкнутого кольца, замкнём его корректно
+                ring1.push(ring1[0]);
+            }
+            if (opsLimitReached) break;
+        }
+
+        // Обновляем координаты полигона
+        poly1.geoObject.geometry.setCoordinates(coords1);
+        if (opsLimitReached) { console.warn('SNAP_OPS_LIMIT достигнут — остановлено досрочно.'); break; }
+    }
+    console.log("Примагничивание вершин полигонов завершено.");
+}
+
+
+// Функция для обрезки нового полигона
+function trimNewPolygons() {
+    console.log("Начало обрезки новых полигонов, чтобы они не пересекались с существующими.");
+    // Сортируем полигоны по ID (предполагается, что больший ID - новее)
+    let sortedPolygons = polygons.slice().sort((a, b) => a.id - b.id);
+
+    for (let i = 0; i < sortedPolygons.length; i++) {
+        let currentPoly = sortedPolygons[i];
+        if (!currentPoly || !currentPoly.geoObject) continue;
+
+        let geojsonCurrent = toGeoJSON(currentPoly.geoObject, currentPoly.id);
+        if (!geojsonCurrent) continue;
+
+        // Создаём мультиполигоны для всех предыдущих полигонов
+        let previousPolygons = sortedPolygons.slice(0, i);
+        let union = null;
+
+        try {
+            previousPolygons.forEach(poly => {
+                let geojsonPoly = toGeoJSON(poly.geoObject, poly.id);
+                if (!geojsonPoly) return;
+                let cleaned = turf.cleanCoords(geojsonPoly);
+                let inflated = mergeTolerance > 0 ? turf.buffer(cleaned, mergeTolerance, { units: 'meters' }) : cleaned;
+                if (union === null) {
+                    union = inflated;
+                } else {
+                    union = turf.union(union, inflated);
+                }
+            });
+            if (union && mergeTolerance > 0) {
+                const deflated = turf.buffer(union, -mergeTolerance, { units: 'meters' });
+                if (deflated) union = turf.cleanCoords(deflated);
+            }
+        } catch (error) {
+            console.error("Ошибка при объединении предыдущих полигонов:", error);
+        }
+
+        if (union) {
+            try {
+                // Вычисляем разницу с учетом допуска: (current + tol) - union, затем обратный толеранс
+                let currentClean = turf.cleanCoords(geojsonCurrent);
+                let currentInflated = mergeTolerance > 0 ? turf.buffer(currentClean, mergeTolerance, { units: 'meters' }) : currentClean;
+                let difference = turf.difference(currentInflated, union);
+                if (difference && mergeTolerance > 0) {
+                    const deflated = turf.buffer(difference, -mergeTolerance, { units: 'meters' });
+                    if (deflated) difference = turf.cleanCoords(deflated);
+                }
+                if (difference) {
+                    if (difference.geometry.type === 'Polygon') {
+                        // Обновляем координаты полигона
+                        let reversedCoords = reverseCoordinates(difference.geometry.coordinates.map(ring => ring));
+                        reversedCoords = reversedCoords.map(ring => ensureClosedRing(ring));
+                        currentPoly.geoObject.geometry.setCoordinates(reversedCoords);
+                        console.log(`Полигон "${currentPoly.name}" обновлён после обрезки.`);
+                    } else if (difference.geometry.type === 'MultiPolygon') {
+                        // Берем самую большую часть мультиполигона
+                        const largest = getLargestPolygonFromMulti(difference);
+                        if (largest) {
+                            let reversedCoords = reverseCoordinates(largest.geometry.coordinates.map(ring => ring));
+                            reversedCoords = reversedCoords.map(ring => ensureClosedRing(ring));
+                            currentPoly.geoObject.geometry.setCoordinates(reversedCoords);
+                            console.log(`Полигон "${currentPoly.name}" обновлён (взята крупнейшая часть после обрезки).`);
+                        } else {
+                            console.warn(`Не удалось выбрать крупнейшую часть для полигона "${currentPoly.name}".`);
+                        }
+                    } else {
+                        console.warn(`Неподдерживаемый тип геометрии после обрезки для полигона "${currentPoly.name}": ${difference.geometry.type}`);
+                    }
+                }
+            } catch (error) {
+                console.error(`Ошибка при вычислении разницы между "${currentPoly.name}" и объединёнными полигонами:`, error);
+            }
+        }
+    }
+
+    console.log("Обрезка полигонов завершена.");
+}
+
+// Функция для обеспечения замкнутости кольца полигона
+function ensureClosedRing(ring) {
+    if (ring.length === 0) return ring;
+    const first = ring[0];
+    const last = ring[ring.length - 1];
+    if (first[0] !== last[0] || first[1] !== last[1]) {
+        ring.push(first);
+    }
+    return ring;
+}
+
+// Возвращает крупнейший полигон из MultiPolygon как Feature<Polygon>
+function getLargestPolygonFromMulti(multiPolygonFeature) {
+    if (!multiPolygonFeature || !multiPolygonFeature.geometry || multiPolygonFeature.geometry.type !== 'MultiPolygon') return null;
+    let best = null;
+    let bestArea = -Infinity;
+    const coordsArray = multiPolygonFeature.geometry.coordinates;
+    for (let idx = 0; idx < coordsArray.length; idx++) {
+        const polygonCoords = coordsArray[idx];
+        const polygonFeature = {
+            type: 'Feature',
+            properties: {},
+            geometry: {
+                type: 'Polygon',
+                coordinates: polygonCoords
+            }
+        };
+        try {
+            const area = turf.area(polygonFeature);
+            if (area > bestArea) {
+                bestArea = area;
+                best = polygonFeature;
+            }
+        } catch (e) {
+            console.warn('Не удалось вычислить площадь у части мультиполигона:', e);
+        }
+    }
+    return best;
+}
+
+// Хелперы для денсификации и топологической стыковки
+function distanceMetersBetweenCoords(a, b) {
+    try {
+        const ar = reverseCoordinates(a);
+        const br = reverseCoordinates(b);
+        return turf.distance(turf.point(ar), turf.point(br), { units: 'meters' });
+    } catch {
+        return Infinity;
+    }
+}
+
+function pointsAlmostEqual(a, b, epsMeters = 0.05) {
+    return distanceMetersBetweenCoords(a, b) <= epsMeters;
+}
+
+function ringHasPointNear(ring, p, epsMeters = 0.05) {
+    for (let i = 0; i < ring.length; i++) {
+        if (pointsAlmostEqual(ring[i], p, epsMeters)) return true;
+    }
+    return false;
+}
+
+function insertPointIntoRing(ring, insertAfterIndex, p) {
+    ring.splice(insertAfterIndex + 1, 0, p);
+}
+
+// Вставляет проекцию внешней вершины на сегмент кольца, если близко
+function tryInsertProjectionOntoSegment(ring, segStartIdx, externalVertex, maxDistanceMeters) {
+    const idxA = segStartIdx;
+    const idxB = segStartIdx + 1;
+    const A = ring[idxA];
+    const B = ring[idxB];
+    const projection = pointToSegmentDistance(externalVertex, A, B);
+    if (!projection || typeof projection.distance !== 'number') return false;
+    if (projection.distance > maxDistanceMeters) return false;
+    const P = projection.closestPoint;
+    if (pointsAlmostEqual(P, A) || pointsAlmostEqual(P, B)) return false;
+    if (ringHasPointNear(ring, P)) return false;
+    insertPointIntoRing(ring, segStartIdx, P);
+    return true;
+}
+
+// Взаимный случай: если два сегмента ближе порога, вставляем точки-проекции в ОБА сегмента
+function tryInsertMutualProjectionForSegments(ringI, segI, ringJ, segJ, maxDistanceMeters) {
+    const Ai = ringI[segI], Bi = ringI[segI + 1];
+    const Aj = ringJ[segJ], Bj = ringJ[segJ + 1];
+    // проекции концов одного сегмента на другой
+    const p1 = pointToSegmentDistance(Ai, Aj, Bj);
+    const p2 = pointToSegmentDistance(Bi, Aj, Bj);
+    const p3 = pointToSegmentDistance(Aj, Ai, Bi);
+    const p4 = pointToSegmentDistance(Bj, Ai, Bi);
+    const candidates = [p1, p2, p3, p4].filter(Boolean);
+    let best = { distance: Infinity };
+    for (const c of candidates) { if (c.distance < best.distance) best = c; }
+    if (!isFinite(best.distance) || best.distance > maxDistanceMeters) return false;
+
+    // Вставим середину ближайшей пары проекций, чтобы стык был симметричным
+    // Подберём пару в соответствии с лучшим случаем
+    let changed = false;
+    if (best === p1 || best === p2) {
+        const Pi = best.closestPoint; // на J
+        const Qj = best.closestPoint; // та же точка
+        if (!ringHasPointNear(ringJ, Qj)) {
+            insertPointIntoRing(ringJ, segJ, Qj);
+            changed = true;
+        }
+        const projOnI = pointToSegmentDistance(Qj, Ai, Bi);
+        if (projOnI && projOnI.distance <= maxDistanceMeters && !ringHasPointNear(ringI, projOnI.closestPoint)) {
+            insertPointIntoRing(ringI, segI, projOnI.closestPoint);
+            changed = true;
+        }
+    } else {
+        const Pi = best.closestPoint; // на I
+        if (!ringHasPointNear(ringI, Pi)) {
+            insertPointIntoRing(ringI, segI, Pi);
+            changed = true;
+        }
+        const projOnJ = pointToSegmentDistance(Pi, Aj, Bj);
+        if (projOnJ && projOnJ.distance <= maxDistanceMeters && !ringHasPointNear(ringJ, projOnJ.closestPoint)) {
+            insertPointIntoRing(ringJ, segJ, projOnJ.closestPoint);
+            changed = true;
+        }
+    }
+    return changed;
+}
+
+// Денсификация: добавляем точки на рёбра по вершинам соседних полигонов в радиусе
+function densifyEdges(maxDistanceMeters) {
+    const startTs = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+    const TIME_BUDGET_MS = 3000;
+    const INSERT_LIMIT = 20000;
+    let totalInserted = 0;
+
+    for (let i = 0; i < polygons.length; i++) {
+        const polyI = polygons[i];
+        if (!polyI || !polyI.geoObject) continue;
+        let coordsI = JSON.parse(JSON.stringify(polyI.geoObject.geometry.getCoordinates()));
+
+        let modifiedI = false;
+
+        for (let j = 0; j < polygons.length; j++) {
+            if (i === j) continue;
+            const polyJ = polygons[j];
+            if (!polyJ || !polyJ.geoObject) continue;
+            const coordsJ = polyJ.geoObject.geometry.getCoordinates();
+
+            for (let rI = 0; rI < coordsI.length; rI++) {
+                const ringI = coordsI[rI];
+                if (!Array.isArray(ringI) || ringI.length < 2) continue;
+                const isClosedI = ringI.length > 0 && ringI[0][0] === ringI[ringI.length - 1][0] && ringI[0][1] === ringI[ringI.length - 1][1];
+
+                for (let rJ = 0; rJ < coordsJ.length; rJ++) {
+                    const ringJ = coordsJ[rJ];
+                    if (!Array.isArray(ringJ) || ringJ.length < 2) continue;
+                    const isClosedJ = ringJ.length > 0 && ringJ[0][0] === ringJ[ringJ.length - 1][0] && ringJ[0][1] === ringJ[ringJ.length - 1][1];
+                    const lastIdxJ = isClosedJ ? ringJ.length - 1 : ringJ.length;
+
+                    // ВАЖНО: длины меняются из-за вставок — используем while и пересчитываем границы
+                    let segStart = 0;
+                    while (segStart < (isClosedI ? ringI.length - 1 : ringI.length - 1)) {
+                        // перебираем вершины внешнего кольца J (без замыкающей)
+                        for (let v = 0; v < lastIdxJ; v++) {
+                            const vJ = ringJ[v];
+                            const inserted = tryInsertProjectionOntoSegment(ringI, segStart, vJ, maxDistanceMeters);
+                            if (inserted) {
+                                modifiedI = true;
+                                totalInserted++;
+                                // пропускаем на следующий сегмент, т.к. текущий разрезан
+                                segStart++;
+                                if (totalInserted >= INSERT_LIMIT) return;
+                            }
+                        }
+
+                        // Также проверяем взаимную близость сегментов и вставляем проекции с обеих сторон
+                        const idxA = segStart;
+                        const idxB = segStart + 1;
+                        const lastJSeg = (isClosedJ ? ringJ.length - 1 : ringJ.length - 1);
+                        for (let segJ = 0; segJ < lastJSeg; segJ++) {
+                            const success = tryInsertMutualProjectionForSegments(ringI, segStart, ringJ, segJ, maxDistanceMeters);
+                            if (success) {
+                                modifiedI = true;
+                                totalInserted++;
+                                if (totalInserted >= INSERT_LIMIT) return;
+                            }
+                        }
+
+                        const nowTs = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+                        if (nowTs - startTs > TIME_BUDGET_MS) return;
+
+                        segStart++;
+                    }
+                }
+            }
+        }
+
+        if (modifiedI) {
+            // восстановим замыкание
+            for (let rI = 0; rI < coordsI.length; rI++) {
+                coordsI[rI] = ensureClosedRing(coordsI[rI]);
+            }
+            polyI.geoObject.geometry.setCoordinates(coordsI);
+        }
+    }
+}
+
+// Заполнение зазоров между полигонами: закрываем микропропуски и распределяем их
+function fillGapsBetweenPolygons() {
+    const features = [];
+    polygons.forEach(p => {
+        const f = toGeoJSON(p.geoObject, p.id);
+        if (f) features.push(turf.cleanCoords(f));
+    });
+    if (features.length < 2) return;
+
+    if (features.length > GAP_MAX_FEATURES_FOR_UNION) {
+        console.warn('Слишком много полигонов для тяжёлого объединения — шаг закрытия зазоров пропущен.');
+        return;
+    }
+
+    // Строим объединение всех полигонов
+    let unionAll = null;
+    features.forEach(f => {
+        unionAll = unionAll ? turf.union(unionAll, f) : f;
+    });
+    if (!unionAll) return;
+
+    // Поиск зазоров с увеличением допуска до gapCloseMax (с лимитом времени)
+    const unionClean = turf.cleanCoords(unionAll);
+    let foundGaps = [];
+    const startTs = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+    const desiredSteps = 6;
+    const step = Math.max(1, Math.floor((gapCloseMax - mergeTolerance) / Math.max(1, desiredSteps)));
+    for (let buf = mergeTolerance; buf <= gapCloseMax; buf += step) {
+        let closed = unionAll;
+        try {
+            const inflated = turf.buffer(unionAll, buf, { units: 'meters' });
+            const deflated = inflated ? turf.buffer(inflated, -buf, { units: 'meters' }) : null;
+            if (deflated) closed = turf.cleanCoords(deflated);
+        } catch (e) {
+            console.warn('buffer failed at', buf, e);
+            continue;
+        }
+        const gaps = turf.difference(closed, unionClean);
+        if (!gaps) continue;
+        const list = explodeToPolygons(gaps);
+        for (const g of list) {
+            // фильтр по площади
+            try {
+                const a = turf.area(g);
+                if (gapMaxArea === 0 || a <= gapMaxArea) {
+                    foundGaps.push(g);
+                }
+            } catch {}
+        }
+        // Ограничения времени и количества
+        const nowTs = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+        if (nowTs - startTs > GAP_TIME_BUDGET_MS) { console.warn('Вышли за бюджет времени при поиске зазоров'); break; }
+        if (foundGaps.length > GAP_MAX_GAPS) { console.warn('Слишком много зазоров, обрежем список'); break; }
+    }
+
+    if (foundGaps.length === 0) return;
+
+    // Убираем дубликаты (по bbox)
+    const uniq = [];
+    const seen = new Set();
+    for (const f of foundGaps) {
+        const b = turf.bbox(f).join(',');
+        if (!seen.has(b)) { seen.add(b); uniq.push(f); }
+    }
+
+    // Для стабильности — по возрастанию площади
+    uniq.sort((a, b) => turf.area(a) - turf.area(b));
+
+    uniq.forEach(gapFeature => {
+        // Находим ближайший полигон (по расстоянию от центроида зазора до границы полигона)
+        const centroid = turf.centroid(gapFeature);
+        let bestIdx = -1;
+        let bestDist = Infinity;
+        for (let idx = 0; idx < features.length; idx++) {
+            const outerRing = features[idx].geometry.type === 'Polygon' ? features[idx].geometry.coordinates[0] : (features[idx].geometry.coordinates[0] && features[idx].geometry.coordinates[0][0]);
+            if (!outerRing) continue;
+            const line = turf.lineString(outerRing);
+            const d = turf.pointToLineDistance(centroid, line, { units: 'meters' });
+            if (d < bestDist) {
+                bestDist = d;
+                bestIdx = idx;
+            }
+        }
+        if (bestIdx === -1) return;
+
+        // Присоединяем зазор к выбранному полигону
+        try {
+            let merged = turf.union(features[bestIdx], gapFeature);
+            if (!merged) return;
+            features[bestIdx] = turf.cleanCoords(merged);
+
+            // Обновляем геометрию на карте
+            const target = polygons[bestIdx];
+            if (!target || !target.geoObject) return;
+
+            if (features[bestIdx].geometry.type === 'Polygon') {
+                let reversedCoords = reverseCoordinates(features[bestIdx].geometry.coordinates.map(r => r));
+                reversedCoords = reversedCoords.map(r => ensureClosedRing(r));
+                target.geoObject.geometry.setCoordinates(reversedCoords);
+            } else if (features[bestIdx].geometry.type === 'MultiPolygon') {
+                const largest = getLargestPolygonFromMulti(features[bestIdx]);
+                if (largest) {
+                    let reversedCoords = reverseCoordinates(largest.geometry.coordinates.map(r => r));
+                    reversedCoords = reversedCoords.map(r => ensureClosedRing(r));
+                    target.geoObject.geometry.setCoordinates(reversedCoords);
+                }
+            }
+        } catch (e) {
+            console.warn('Не удалось присоединить зазор:', e);
+        }
+    });
+}
+
+// Преобразует Polygon/MultiPolygon Feature в массив Feature<Polygon>
+function explodeToPolygons(feature) {
+    const result = [];
+    if (!feature || !feature.geometry) return result;
+    if (feature.geometry.type === 'Polygon') {
+        result.push(feature);
+    } else if (feature.geometry.type === 'MultiPolygon') {
+        const parts = feature.geometry.coordinates || [];
+        for (let i = 0; i < parts.length; i++) {
+            result.push({ type: 'Feature', properties: {}, geometry: { type: 'Polygon', coordinates: parts[i] } });
+        }
+    }
+    return result;
+}
+
+// Функция для установки границ карты в соответствии с полигоном
+function fitMapToPolygon(polygon) {
+    const bounds = polygon.geometry.getBounds();
+    map.setBounds(bounds, {
+        checkZoomRange: true,
+        zoomMargin: 20
+    });
+}
+
+// Функция для вычисления минимального расстояния от точки до отрезка и ближайшей точки на отрезке
+function pointToSegmentDistance(pt, v, w) {
+    // Реверсируем координаты для Turf.js
+    const ptRev = reverseCoordinates(pt);
+    const vRev = reverseCoordinates(v);
+    const wRev = reverseCoordinates(w);
+
+    try {
+        const distanceData = turf.pointToLineDistance(turf.point(ptRev), turf.lineString([vRev, wRev]), { units: 'meters' });
+        const closestPoint = turf.nearestPointOnLine(turf.lineString([vRev, wRev]), turf.point(ptRev)).geometry.coordinates;
+
+        // Реверсируем координаты обратно для Яндекс.Карт
+        const closestPointYandex = reverseCoordinates(closestPoint);
+
+        return { distance: distanceData, closestPoint: closestPointYandex };
+    } catch (error) {
+        console.error('Error during pointToSegmentDistance:', error);
+        return { distance: Infinity, closestPoint: pt }; // Возвращаем бесконечность и исходную точку при ошибке
+    }
+}
+
+// Функция для преобразования координат Яндекс.Карт в формат GeoJSON с реверсированием
+function reverseCoordinates(coords) {
+    if (Array.isArray(coords[0])) {
+        // Массив координат (например, кольцо или полигон)
+        return coords.map(coord => reverseCoordinates(coord));
+    } else {
+        // Одиночная координата
+        return [coords[1], coords[0]];
+    }
+}
+
+// Функция для экспорта полигонов в GeoJSON
+function exportPolygonsToGeoJSON() {
+    const features = polygons.map(polygon => toGeoJSON(polygon.geoObject, polygon.id));
+    const geojson = {
+        type: 'FeatureCollection',
+        features: features
+    };
+    console.log('Экспортированные данные GeoJSON:', JSON.stringify(geojson, null, 2));
+    return geojson;
+}
+
+// Функция для импорта полигонов из GeoJSON
+function importPolygonsFromGeoJSON(geojsonData) {
+    if (!geojsonData || !geojsonData.features) {
+        console.error('Неверный формат данных GeoJSON.');
+        return;
+    }
+
+    geojsonData.features.forEach(feature => {
+        if (feature.geometry.type !== 'Polygon' && feature.geometry.type !== 'MultiPolygon') {
+            console.warn('Поддерживаются только геометрии типа Polygon или MultiPolygon.');
+            return;
+        }
+
+        // Преобразуем координаты из GeoJSON в формат Яндекс.Карт
+        let coords = feature.geometry.coordinates;
+        coords = coords.map(ring => reverseCoordinates(ring));
+
+        // Получаем свойства
+        const properties = feature.properties || {};
+        const name = properties.description || `Импортированный полигон ${polygonIdCounter}`;
+        const fillColor = properties.fill || '#ed4543';
+        const fillOpacity = properties['fill-opacity'] !== undefined ? properties['fill-opacity'] : 0.6;
+        const strokeColor = properties.stroke || '#ed4543';
+        const strokeWidth = 0.5;
+        const strokeOpacity = properties['stroke-opacity'] !== undefined ? properties['stroke-opacity'] : 0.9;
+
+        // Формируем цвет с учетом прозрачности
+        const fillOpacityHex = Math.round(fillOpacity * 255).toString(16).padStart(2, '0');
+        const fillColorWithOpacity = fillColor + fillOpacityHex;
+
+        // Создаем новый полигон
+        const newPolygon = new ymaps.Polygon(coords, {}, {
+            fillColor: fillColorWithOpacity,
+            strokeColor: strokeColor,
+            strokeWidth: strokeWidth,
+            draggable: false
+        });
+
+        // Добавляем на карту
+        map.geoObjects.add(newPolygon);
+
+        // Создаем объект полигона для управления
+        const polygonObject = {
+            id: polygonIdCounter++,
+            name: name,
+            color: fillColor,
+            geoObject: newPolygon,
+            dragendHandler: null
+        };
+
+        newPolygon.properties.set('name', name);
+
+        polygons.push(polygonObject);
+
+        addPolygonToList(polygonObject);
+
+        // Добавляем событие клика на полигон для входа в режим редактирования
+        newPolygon.events.add('click', function (e) {
+            e.stopPropagation();
+            enterEditMode(polygonObject);
+        });
+
+        console.log(`Полигон "${name}" импортирован и добавлен на карту.`);
+    });
+}
+
+// Функция для загрузки GeoJSON файла
+function loadGeoJSONFile() {
+    const fileInput = document.getElementById('geojson-file-input');
+    const file = fileInput.files[0];
+
+    if (!file) {
+        alert('Пожалуйста, выберите файл GeoJSON для загрузки.');
+        return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        try {
+            const geojsonData = JSON.parse(e.target.result);
+            importPolygonsFromGeoJSON(geojsonData);
+            alert('GeoJSON файл успешно загружен.');
+            // Очищаем input после загрузки
+            fileInput.value = '';
+        } catch (error) {
+            console.error('Ошибка при загрузке GeoJSON файла:', error);
+            alert('Ошибка при загрузке файла. Убедитесь, что файл содержит корректный GeoJSON.');
+        }
+    };
+    reader.readAsText(file);
+}
+
+// Функция для выгрузки полигонов в GeoJSON файл
+function exportGeoJSONFile() {
+    if (polygons.length === 0) {
+        alert('Нет полигонов для экспорта.');
+        return;
+    }
+
+    try {
+        const geojson = exportPolygonsToGeoJSON();
+
+        // Создаем blob из GeoJSON данных
+        const blob = new Blob([JSON.stringify(geojson, null, 2)], {
+            type: 'application/json'
+        });
+
+        // Создаем ссылку для скачивания
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'polygons.geojson';
+
+        // Добавляем ссылку на страницу и кликаем по ней
+        document.body.appendChild(a);
+        a.click();
+
+        // Удаляем ссылку и освобождаем память
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+
+        console.log('GeoJSON файл успешно выгружен.');
+    } catch (error) {
+        console.error('Ошибка при экспорте GeoJSON файла:', error);
+        alert('Ошибка при экспорте файла.');
+    }
+}
+
+// Сшивание границ: заменяем близкие участки границ на общие отрезки из соседа
+function stitchBoundaries(maxDistanceMeters) {
+    console.log('Начало сшивания границ...');
+    const TIME_BUDGET_MS = 5000;
+    const startTs = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+
+    for (let i = 0; i < polygons.length; i++) {
+        const polyI = polygons[i];
+        if (!polyI || !polyI.geoObject) continue;
+        let coordsI = JSON.parse(JSON.stringify(polyI.geoObject.geometry.getCoordinates()));
+        let modified = false;
+
+        for (let j = 0; j < polygons.length; j++) {
+            if (i === j) continue;
+            const polyJ = polygons[j];
+            if (!polyJ || !polyJ.geoObject) continue;
+            const coordsJ = polyJ.geoObject.geometry.getCoordinates();
+
+            for (let rI = 0; rI < coordsI.length; rI++) {
+                const ringI = coordsI[rI];
+                if (!Array.isArray(ringI) || ringI.length < 2) continue;
+
+                for (let rJ = 0; rJ < coordsJ.length; rJ++) {
+                    const ringJ = coordsJ[rJ];
+                    if (!Array.isArray(ringJ) || ringJ.length < 2) continue;
+
+                    // Ищем последовательные участки в ringI, которые близки к участкам ringJ
+                    const replaced = replaceCloseSegmentsWithShared(ringI, ringJ, maxDistanceMeters);
+                    if (replaced) modified = true;
+                }
+            }
+        }
+
+        if (modified) {
+            for (let rI = 0; rI < coordsI.length; rI++) {
+                coordsI[rI] = ensureClosedRing(coordsI[rI]);
+            }
+            polyI.geoObject.geometry.setCoordinates(coordsI);
+        }
+
+        const nowTs = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+        if (nowTs - startTs > TIME_BUDGET_MS) {
+            console.warn('Вышли за бюджет времени при сшивании границ');
+            break;
+        }
+    }
+    console.log('Сшивание границ завершено.');
+}
+
+// Заменяет участки ringI, близкие к ringJ, на соответствующие отрезки из ringJ
+function replaceCloseSegmentsWithShared(ringI, ringJ, maxDistanceMeters) {
+    let modified = false;
+    const EPS = 0.1; // метры
+
+    // Ищем цепочки последовательных вершин в ringI, каждая из которых близка к ringJ
+    let i = 0;
+    while (i < ringI.length - 1) {
+        // Проверяем, близка ли вершина ringI[i] к какому-то сегменту ringJ
+        const vi = ringI[i];
+        let closestJ = findClosestPointOnRing(vi, ringJ);
+        if (!closestJ || closestJ.distance > maxDistanceMeters) {
+            i++;
+            continue;
+        }
+
+        // Начинаем цепочку близких вершин
+        const chainStart = i;
+        let chainEnd = i;
+        while (chainEnd < ringI.length - 1) {
+            const vNext = ringI[chainEnd + 1];
+            const closestNext = findClosestPointOnRing(vNext, ringJ);
+            if (!closestNext || closestNext.distance > maxDistanceMeters) break;
+            chainEnd++;
+        }
+
+        // Если нашли цепочку из 2+ вершин, заменяем её на соответствующий участок из ringJ
+        if (chainEnd > chainStart) {
+            const vStart = ringI[chainStart];
+            const vEnd = ringI[chainEnd];
+            const closestStart = findClosestPointOnRing(vStart, ringJ);
+            const closestEnd = findClosestPointOnRing(vEnd, ringJ);
+            if (closestStart && closestEnd) {
+                // Извлекаем участок из ringJ между closestStart.segIdx и closestEnd.segIdx
+                const extracted = extractRingSegment(ringJ, closestStart, closestEnd);
+                if (extracted && extracted.length >= 2) {
+                    // Заменяем ringI[chainStart..chainEnd] на extracted
+                    ringI.splice(chainStart, chainEnd - chainStart + 1, ...extracted);
+                    modified = true;
+                    i = chainStart + extracted.length;
+                    continue;
+                }
+            }
+        }
+
+        i++;
+    }
+
+    return modified;
+}
+
+// Находит ближайшую точку на кольце и возвращает {distance, closestPoint, segIdx, t}
+function findClosestPointOnRing(pt, ring) {
+    let best = { distance: Infinity, closestPoint: null, segIdx: -1, t: 0 };
+    for (let k = 0; k < ring.length - 1; k++) {
+        const A = ring[k];
+        const B = ring[k + 1];
+        const proj = pointToSegmentDistance(pt, A, B);
+        if (proj && proj.distance < best.distance) {
+            // Вычисляем параметр t вдоль сегмента
+            const dAB = distanceMetersBetweenCoords(A, B);
+            const dAP = distanceMetersBetweenCoords(A, proj.closestPoint);
+            const t = dAB > 0 ? dAP / dAB : 0;
+            best = { distance: proj.distance, closestPoint: proj.closestPoint, segIdx: k, t: t };
+        }
+    }
+    return best.distance < Infinity ? best : null;
+}
+
+// Извлекает участок кольца между двумя проекциями
+function extractRingSegment(ring, projStart, projEnd) {
+    const idxStart = projStart.segIdx;
+    const idxEnd = projEnd.segIdx;
+    if (idxStart < 0 || idxEnd < 0) return null;
+
+    const result = [];
+    result.push(projStart.closestPoint);
+
+    if (idxStart === idxEnd) {
+        // Оба на одном сегменте
+        if (projEnd.t > projStart.t) {
+            result.push(projEnd.closestPoint);
+        }
+    } else if (idxEnd > idxStart) {
+        // Прямой порядок
+        for (let k = idxStart + 1; k <= idxEnd; k++) {
+            result.push(ring[k]);
+        }
+        result.push(projEnd.closestPoint);
+    } else {
+        // Обратный порядок (через замыкание кольца)
+        for (let k = idxStart + 1; k < ring.length; k++) {
+            result.push(ring[k]);
+        }
+        for (let k = 0; k <= idxEnd; k++) {
+            result.push(ring[k]);
+        }
+        result.push(projEnd.closestPoint);
+    }
+
+    return result;
+}
+
+// Агрессивное закрытие зазоров без буферизации — просто находим и распределяем
+function fillGapsBetweenPolygonsAggressive(maxDistanceMeters) {
+    console.log('Агрессивное закрытие зазоров...');
+    const features = [];
+    polygons.forEach(p => {
+        const f = toGeoJSON(p.geoObject, p.id);
+        if (f) features.push(turf.cleanCoords(f));
+    });
+    if (features.length < 2) return;
+
+    // Строим объединение всех полигонов
+    let unionAll = null;
+    features.forEach(f => {
+        unionAll = unionAll ? turf.union(unionAll, f) : f;
+    });
+    if (!unionAll) return;
+
+    // Морфологическое закрытие с maxDistanceMeters
+    let unionClosed = unionAll;
+    try {
+        const inflated = turf.buffer(unionAll, maxDistanceMeters, { units: 'meters' });
+        const deflated = inflated ? turf.buffer(inflated, -maxDistanceMeters, { units: 'meters' }) : null;
+        if (deflated) unionClosed = turf.cleanCoords(deflated);
+    } catch (e) {
+        console.warn('buffer failed', e);
+        return;
+    }
+
+    // Вычисляем зазоры
+    const unionClean = turf.cleanCoords(unionAll);
+    let gaps = turf.difference(unionClosed, unionClean);
+    if (!gaps) return;
+
+    const gapPolygons = explodeToPolygons(gaps);
+    if (gapPolygons.length === 0) return;
+
+    // Сортируем по площади
+    gapPolygons.sort((a, b) => turf.area(a) - turf.area(b));
+
+    gapPolygons.forEach(gapFeature => {
+        const centroid = turf.centroid(gapFeature);
+        let bestIdx = -1;
+        let bestDist = Infinity;
+        for (let idx = 0; idx < features.length; idx++) {
+            const outerRing = features[idx].geometry.type === 'Polygon' ? features[idx].geometry.coordinates[0] : (features[idx].geometry.coordinates[0] && features[idx].geometry.coordinates[0][0]);
+            if (!outerRing) continue;
+            const line = turf.lineString(outerRing);
+            const d = turf.pointToLineDistance(centroid, line, { units: 'meters' });
+            if (d < bestDist) {
+                bestDist = d;
+                bestIdx = idx;
+            }
+        }
+        if (bestIdx === -1) return;
+
+        try {
+            let merged = turf.union(features[bestIdx], gapFeature);
+            if (!merged) return;
+            features[bestIdx] = turf.cleanCoords(merged);
+
+            const target = polygons[bestIdx];
+            if (!target || !target.geoObject) return;
+
+            if (features[bestIdx].geometry.type === 'Polygon') {
+                let reversedCoords = reverseCoordinates(features[bestIdx].geometry.coordinates.map(r => r));
+                reversedCoords = reversedCoords.map(r => ensureClosedRing(r));
+                target.geoObject.geometry.setCoordinates(reversedCoords);
+            } else if (features[bestIdx].geometry.type === 'MultiPolygon') {
+                const largest = getLargestPolygonFromMulti(features[bestIdx]);
+                if (largest) {
+                    let reversedCoords = reverseCoordinates(largest.geometry.coordinates.map(r => r));
+                    reversedCoords = reversedCoords.map(r => ensureClosedRing(r));
+                    target.geoObject.geometry.setCoordinates(reversedCoords);
+                }
+            }
+        } catch (e) {
+            console.warn('Не удалось присоединить зазор:', e);
+        }
+    });
+    console.log('Агрессивное закрытие зазоров завершено.');
+}
+
+</script>
+
+</body>
+</html>
+

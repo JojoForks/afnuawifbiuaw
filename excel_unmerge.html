@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Разъединение объединенных ячеек Excel</title>
+</head>
+<body>
+
+    <h1>Разъединение объединенных ячеек Excel</h1>
+
+    <p>
+        <label>Выберите Excel файл (.xlsx):</label><br>
+        <input type="file" id="excelFile" accept=".xlsx,.xls">
+    </p>
+
+    <p>
+        <label>Выберите лист:</label><br>
+        <select id="sheetName" disabled>
+            <option value="">Сначала загрузите файл</option>
+        </select>
+    </p>
+
+    <p>
+        <button id="processBtn">Обработать файл</button>
+        <button id="downloadBtn" style="display:none">Скачать обработанный файл</button>
+    </p>
+
+    <!-- Подключаем XLSX-Populate для работы с Excel со стилями -->
+    <script src="https://unpkg.com/xlsx-populate/browser/xlsx-populate.min.js"></script>
+    <!-- Подключаем SheetJS для парсинга merges -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
+    <script>
+        // Элементы интерфейса
+        const excelFileInput = document.getElementById('excelFile');
+        const sheetNameSelect = document.getElementById('sheetName');
+        const processBtn = document.getElementById('processBtn');
+        const downloadBtn = document.getElementById('downloadBtn');
+
+        let processedWorkbook = null;
+        let originalFileName = '';
+
+        // Функция для загрузки списка листов из файла (через XLSX-Populate)
+        async function loadSheetList(file) {
+            try {
+                const data = await file.arrayBuffer();
+                processedWorkbook = await XlsxPopulate.fromDataAsync(data);
+
+                // Очищаем список
+                sheetNameSelect.innerHTML = '';
+
+                const sheetNames = processedWorkbook.sheets().map(s => s.name());
+
+                sheetNames.forEach(name => {
+                    const option = document.createElement('option');
+                    option.value = name;
+                    option.textContent = name;
+                    sheetNameSelect.appendChild(option);
+                });
+
+                if (sheetNames.length > 0) {
+                    sheetNameSelect.value = sheetNames[0];
+                }
+
+                sheetNameSelect.disabled = false;
+                return sheetNames;
+            } catch (error) {
+                alert(`Ошибка при чтении файла: ${error.message}`);
+                sheetNameSelect.innerHTML = '<option value="">Ошибка загрузки файла</option>';
+                sheetNameSelect.disabled = true;
+                processedWorkbook = null;
+                return [];
+            }
+        }
+
+        // Основная функция обработки (SheetJS: получаем список merges, XLSX-Populate: копируем значения/стили и разъединяем)
+        async function processExcelFile(file) {
+            try {
+                // Всегда читаем исходные данные, чтобы получить точные merges через SheetJS
+                const data = await file.arrayBuffer();
+                if (!processedWorkbook) {
+                    processedWorkbook = await XlsxPopulate.fromDataAsync(data);
+                }
+
+                originalFileName = file.name.replace(/\.xlsx?$/, '');
+
+                const sheetName = sheetNameSelect.value;
+                const sheet = processedWorkbook.sheet(sheetName);
+                if (!sheet) throw new Error(`Лист "${sheetName}" не найден`);
+
+                // Получаем merges через SheetJS (надежный список всех объединений)
+                const wbSS = XLSX.read(data, { type: 'array' });
+                const wsSS = wbSS.Sheets[sheetName];
+                const merges = (wsSS && wsSS['!merges']) ? wsSS['!merges'] : [];
+                const mergeRanges = merges.map(m => XLSX.utils.encode_range(m));
+
+                // Обрабатываем каждый объединенный диапазон: копируем значение/стиль из верхней-левой ячейки во все ячейки диапазона и снимаем объединение
+                // Список свойств стилей, поддерживаемых XLSX-Populate
+                const styleProps = [
+                    'bold', 'italic', 'underline', 'strikethrough',
+                    'fontColor', 'fontFamily', 'fontSize',
+                    'horizontalAlignment', 'verticalAlignment',
+                    'wrapText', 'shrinkToFit', 'textRotation',
+                    'numberFormat', 'fill', 'border'
+                ];
+
+                for (const rangeStr of mergeRanges) {
+                    const rng = sheet.range(rangeStr);
+                    const tl = rng.startCell();
+                    const br = rng.endCell();
+                    const tlRow = tl.rowNumber();
+                    const tlCol = tl.columnNumber();
+                    const brRow = br.rowNumber();
+                    const brCol = br.columnNumber();
+
+                    // Берем отображаемое значение. Если формула, используем кэшированное значение
+                    const baseValue = tl.value();
+
+                    // Снимаем слепок стиля как простой объект
+                    const baseStyleObj = {};
+                    for (const prop of styleProps) {
+                        try {
+                            const val = tl.style(prop);
+                            if (val !== undefined && val !== null) {
+                                baseStyleObj[prop] = val;
+                            }
+                        } catch (e) {
+                            // игнорируем неподдерживаемые свойства
+                        }
+                    }
+
+                    for (let r = tlRow; r <= brRow; r++) {
+                        for (let c = tlCol; c <= brCol; c++) {
+                            const cell = sheet.cell(r, c);
+                            cell.value(baseValue);
+                            // Применяем стиль по объекту свойств
+                            try {
+                                if (Object.keys(baseStyleObj).length > 0) {
+                                    cell.style(baseStyleObj);
+                                }
+                            } catch (e) {
+                                // В случае спец.стилей пропускаем, чтобы не падать
+                            }
+                        }
+                    }
+
+                    rng.merged(false);
+                }
+
+                return true;
+            } catch (error) {
+                alert(`Ошибка: ${error.message}`);
+                return false;
+            }
+        }
+
+        // Функция скачивания файла
+        async function downloadProcessedFile() {
+            if (!processedWorkbook) return;
+            try {
+                const outputFileName = `${originalFileName}_unmerged.xlsx`;
+                const out = await processedWorkbook.outputAsync();
+                const blob = out instanceof Blob ? out : new Blob([out], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = outputFileName;
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+                URL.revokeObjectURL(url);
+            } catch (error) {
+                alert(`Ошибка при сохранении файла: ${error.message}`);
+            }
+        }
+
+        // Обработчик изменения файла
+        excelFileInput.addEventListener('change', async (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                await loadSheetList(file);
+            }
+        });
+
+        // Обработчик кнопки обработки
+        processBtn.addEventListener('click', async () => {
+            const file = excelFileInput.files[0];
+            if (!file) {
+                alert('Пожалуйста, выберите файл');
+                return;
+            }
+
+            if (!sheetNameSelect.value) {
+                alert('Пожалуйста, выберите лист');
+                return;
+            }
+
+            processBtn.textContent = 'Обработка...';
+            processBtn.disabled = true;
+
+            const success = await processExcelFile(file);
+
+            processBtn.disabled = false;
+            if (success) {
+                processBtn.textContent = 'Файл обработан';
+                downloadBtn.style.display = 'inline';
+            } else {
+                processBtn.textContent = 'Обработать файл';
+            }
+        });
+
+        // Обработчик кнопки скачивания
+        downloadBtn.addEventListener('click', downloadProcessedFile);
+    </script>
+</body>
+</html>

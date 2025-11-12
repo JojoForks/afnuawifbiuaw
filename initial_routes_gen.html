@@ -1,0 +1,857 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>initial_routes generator</title>
+    <link href="https://cdn.jsdelivr.net/npm/jsoneditor@9/dist/jsoneditor.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/jsoneditor@9/dist/jsoneditor.min.js"></script>
+    <style>
+        :root {
+            --bg-color: #ffffff;
+            --text-color: #333333;
+            --border-color: #e0e0e0;
+            --accent-color: #007bff;
+            --hover-color: #0056b3;
+            --success-color: #28a745;
+            --error-color: #dc3545;
+            --card-bg: #f8f9fa;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            line-height: 1.6;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding-bottom: 20px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .card {
+            background: var(--card-bg);
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .upload-section {
+            border: 2px dashed var(--border-color);
+            border-radius: 8px;
+            padding: 40px;
+            text-align: center;
+            margin-bottom: 20px;
+            transition: all 0.3s ease;
+        }
+
+        .upload-section:hover {
+            border-color: var(--accent-color);
+            background-color: rgba(0,123,255,0.05);
+        }
+
+        .upload-section.dragover {
+            border-color: var(--accent-color);
+            background-color: rgba(0,123,255,0.1);
+        }
+
+        .file-input {
+            display: none;
+        }
+
+        .upload-btn {
+            background-color: var(--accent-color);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 16px;
+            margin-top: 10px;
+            transition: background-color 0.3s ease;
+        }
+
+        .upload-btn:hover {
+            background-color: var(--hover-color);
+        }
+
+        .status {
+            padding: 10px;
+            border-radius: 4px;
+            margin-top: 10px;
+            display: none;
+        }
+
+        .status.success {
+            background-color: rgba(40, 167, 69, 0.1);
+            color: var(--success-color);
+            border: 1px solid var(--success-color);
+        }
+
+        .status.error {
+            background-color: rgba(220, 53, 69, 0.1);
+            color: var(--error-color);
+            border: 1px solid var(--error-color);
+        }
+
+        .result-section {
+            display: none;
+        }
+
+        .settings-section {
+            margin-bottom: 20px;
+        }
+
+        .settings-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 15px;
+        }
+
+        .setting-group {
+            background: var(--card-bg);
+            padding: 15px;
+            border-radius: 6px;
+            border: 1px solid var(--border-color);
+        }
+
+        .setting-group h4 {
+            margin: 0 0 10px 0;
+            color: var(--accent-color);
+            font-size: 14px;
+            font-weight: 600;
+        }
+
+        .setting-item {
+            display: flex;
+            align-items: flex-start;
+            gap: 8px;
+            margin-bottom: 8px;
+        }
+
+        .setting-item:last-child {
+            margin-bottom: 0;
+        }
+
+        .setting-checkbox {
+            margin-top: 2px;
+        }
+
+        .setting-label {
+            font-size: 13px;
+            line-height: 1.4;
+            cursor: pointer;
+            flex: 1;
+        }
+
+        .sub-settings {
+            margin-left: 24px;
+            margin-top: 8px;
+        }
+
+        .radio-group {
+            display: flex;
+            gap: 15px;
+            margin-top: 5px;
+        }
+
+        .radio-option {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .radio-option input {
+            margin: 0;
+        }
+
+        .radio-option label {
+            font-size: 12px;
+            cursor: pointer;
+        }
+
+        .result-controls {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .btn {
+            background-color: var(--accent-color);
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background-color 0.3s ease;
+        }
+
+        .btn:hover {
+            background-color: var(--hover-color);
+        }
+
+        .btn.secondary {
+            background-color: var(--card-bg);
+            color: var(--text-color);
+            border: 1px solid var(--border-color);
+        }
+
+        .btn.secondary:hover {
+            background-color: var(--border-color);
+        }
+
+        .result-json {
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            height: 600px;
+            position: relative;
+        }
+
+        .json-editor-container {
+            height: 100%;
+            width: 100%;
+        }
+
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .stat-card {
+            background: var(--card-bg);
+            padding: 15px;
+            border-radius: 6px;
+            text-align: center;
+        }
+
+        .stat-number {
+            font-size: 24px;
+            font-weight: bold;
+            color: var(--accent-color);
+            margin-bottom: 5px;
+        }
+
+        .stat-label {
+            font-size: 14px;
+            color: var(--text-color);
+            opacity: 0.8;
+        }
+
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(255,255,255,.3);
+            border-radius: 50%;
+            border-top-color: #fff;
+            animation: spin 1s ease-in-out infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 10px;
+            }
+
+            .header {
+                flex-direction: column;
+                gap: 15px;
+                text-align: center;
+            }
+
+            .result-controls {
+                flex-direction: column;
+            }
+
+            .stats {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>initial_routes generator</h1>
+        </div>
+
+        <div class="card">
+            <div class="upload-section" id="uploadSection">
+                <div>
+                    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" style="margin-bottom: 10px; opacity: 0.5;">
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                        <polyline points="14,2 14,8 20,8"></polyline>
+                    </svg>
+                    <p style="margin-bottom: 10px; font-size: 18px;">Перетащите JSON файл сюда или нажмите для выбора</p>
+                    <p style="opacity: 0.7; font-size: 14px;">Поддерживаются форматы: test.json и результаты оптимизации маршрутов</p>
+                    <input type="file" id="fileInput" class="file-input" accept=".json">
+                    <br>
+                    <button class="upload-btn" id="uploadBtn">Выбрать файл</button>
+                </div>
+            </div>
+
+            <div class="status" id="status"></div>
+        </div>
+
+        <div class="settings-section" id="settingsSection">
+            <div class="settings-grid">
+                <div class="setting-group">
+                    <h4>Времена прибытия/убытия</h4>
+                    <div class="setting-item">
+                        <input type="checkbox" id="transferTimes" class="setting-checkbox">
+                        <label for="transferTimes" class="setting-label">
+                            Переносить departure и arrival времена
+                        </label>
+                    </div>
+                    <div class="sub-settings" id="timesOptions" style="display: none;">
+                        <div class="radio-group">
+                            <div class="radio-option">
+                                <input type="radio" id="timesAsIs" name="timesMode" value="asis" checked>
+                                <label for="timesAsIs">Сохранить как есть</label>
+                            </div>
+                            <div class="radio-option">
+                                <input type="radio" id="timesActual" name="timesMode" value="actual">
+                                <label for="timesActual">Добавить приставку actual_</label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="setting-group">
+                    <h4>Фиксация маршрутов</h4>
+                    <div class="setting-item">
+                        <input type="checkbox" id="fixRoutes" class="setting-checkbox" checked>
+                        <label for="fixRoutes" class="setting-label">
+                            Фиксировать маршруты (fixed_position)
+                        </label>
+                    </div>
+                    <div class="sub-settings" id="fixOptions">
+                        <div class="radio-group">
+                            <div class="radio-option">
+                                <input type="radio" id="fixAll" name="fixMode" value="all" checked>
+                                <label for="fixAll">Все ноды - true</label>
+                            </div>
+                            <div class="radio-option">
+                                <input type="radio" id="fixFirstOnly" name="fixMode" value="first">
+                                <label for="fixFirstOnly">Только первый рейс - true, остальные - false</label>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="setting-item">
+                        <input type="checkbox" id="fixVehicle" class="setting-checkbox">
+                        <label for="fixVehicle" class="setting-label">
+                            Фиксировать транспортное средство (fixed_vehicle)
+                        </label>
+                    </div>
+                    <div class="setting-item">
+                        <input type="checkbox" id="fixShift" class="setting-checkbox">
+                        <label for="fixShift" class="setting-label">
+                            Фиксировать смену (fixed_shift)
+                        </label>
+                    </div>
+                    <div class="setting-item">
+                        <input type="checkbox" id="fixRun" class="setting-checkbox">
+                        <label for="fixRun" class="setting-label">
+                            Фиксировать рейс (fixed_run)
+                        </label>
+                    </div>
+                </div>
+
+                <div class="setting-group">
+                    <h4>Дополнительные параметры</h4>
+                    <div class="setting-item">
+                        <input type="checkbox" id="makeUndroppable" class="setting-checkbox">
+                        <label for="makeUndroppable" class="setting-label">
+                            Сделать все точки undroppable (неудаляемые)
+                        </label>
+                    </div>
+                    <div class="setting-item">
+                        <input type="checkbox" id="fixStartTime" class="setting-checkbox">
+                        <label for="fixStartTime" class="setting-label">
+                            Фиксировать время старта рейса (actual_departure/arrival для первого депота)
+                        </label>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="result-section" id="resultSection">
+            <div class="stats" id="stats"></div>
+
+            <div class="result-controls">
+                <button class="btn" id="downloadBtn">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 5px;">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                        <polyline points="7,10 12,15 17,10"></polyline>
+                        <line x1="12" y1="15" x2="12" y2="3"></line>
+                    </svg>
+                    Скачать JSON
+                </button>
+                <button class="btn secondary" id="copyBtn">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 5px;">
+                        <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                    </svg>
+                    Копировать
+                </button>
+            </div>
+
+            <div class="result-json">
+                <div id="jsonEditor" class="json-editor-container"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+
+        // Переменные
+        let jsonData = null;
+        let processedData = null;
+
+        // Настройки
+        let settings = {
+            transferTimes: false,
+            timesMode: 'asis',
+            fixRoutes: true,
+            fixMode: 'all',
+            fixVehicle: false,
+            fixShift: false,
+            fixRun: false,
+            makeUndroppable: false,
+            fixStartTime: false
+        };
+
+        // Элементы DOM
+        const uploadSection = document.getElementById('uploadSection');
+        const fileInput = document.getElementById('fileInput');
+        const uploadBtn = document.getElementById('uploadBtn');
+        const status = document.getElementById('status');
+        const resultSection = document.getElementById('resultSection');
+        const resultJson = document.getElementById('resultJson');
+        const downloadBtn = document.getElementById('downloadBtn');
+        const copyBtn = document.getElementById('copyBtn');
+        const stats = document.getElementById('stats');
+
+        // JSON Editor
+        let jsonEditor;
+
+        // Элементы настроек
+        const transferTimes = document.getElementById('transferTimes');
+        const timesOptions = document.getElementById('timesOptions');
+        const timesAsIs = document.getElementById('timesAsIs');
+        const timesActual = document.getElementById('timesActual');
+        const fixRoutes = document.getElementById('fixRoutes');
+        const fixOptions = document.getElementById('fixOptions');
+        const fixAll = document.getElementById('fixAll');
+        const fixFirstOnly = document.getElementById('fixFirstOnly');
+        const fixVehicle = document.getElementById('fixVehicle');
+        const fixShift = document.getElementById('fixShift');
+        const fixRun = document.getElementById('fixRun');
+        const makeUndroppable = document.getElementById('makeUndroppable');
+        const fixStartTime = document.getElementById('fixStartTime');
+        const settingsSection = document.getElementById('settingsSection');
+
+        // Обработчики загрузки файла
+        uploadBtn.addEventListener('click', () => fileInput.click());
+        fileInput.addEventListener('change', handleFileSelect);
+
+        // Инициализация JSON Editor
+        function initJsonEditor() {
+            const container = document.getElementById('jsonEditor');
+            const options = {
+                mode: 'code',
+                modes: ['view', 'tree', 'code'],
+                onModeChange: function(newMode, oldMode) {
+                    console.log('Mode switched from', oldMode, 'to', newMode);
+                }
+            };
+            jsonEditor = new JSONEditor(container, options);
+        }
+
+        // Инициализация при загрузке страницы
+        document.addEventListener('DOMContentLoaded', function() {
+            initJsonEditor();
+        });
+
+        // Обработчики настроек
+        transferTimes.addEventListener('change', (e) => {
+            settings.transferTimes = e.target.checked;
+            timesOptions.style.display = e.target.checked ? 'block' : 'none';
+            if (processedData) processData();
+        });
+
+        document.querySelectorAll('input[name="timesMode"]').forEach(radio => {
+            radio.addEventListener('change', (e) => {
+                settings.timesMode = e.target.value;
+                if (processedData) processData();
+            });
+        });
+
+        fixRoutes.addEventListener('change', (e) => {
+            settings.fixRoutes = e.target.checked;
+            fixOptions.style.display = e.target.checked ? 'block' : 'none';
+            if (processedData) processData();
+        });
+
+        document.querySelectorAll('input[name="fixMode"]').forEach(radio => {
+            radio.addEventListener('change', (e) => {
+                settings.fixMode = e.target.value;
+                if (processedData) processData();
+            });
+        });
+
+        fixVehicle.addEventListener('change', (e) => {
+            settings.fixVehicle = e.target.checked;
+            if (processedData) processData();
+        });
+
+        fixShift.addEventListener('change', (e) => {
+            settings.fixShift = e.target.checked;
+            if (processedData) processData();
+        });
+
+        fixRun.addEventListener('change', (e) => {
+            settings.fixRun = e.target.checked;
+            if (processedData) processData();
+        });
+
+        makeUndroppable.addEventListener('change', (e) => {
+            settings.makeUndroppable = e.target.checked;
+            if (processedData) processData();
+        });
+
+        fixStartTime.addEventListener('change', (e) => {
+            settings.fixStartTime = e.target.checked;
+            if (processedData) processData();
+        });
+
+        // Drag & Drop
+        uploadSection.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadSection.classList.add('dragover');
+        });
+
+        uploadSection.addEventListener('dragleave', () => {
+            uploadSection.classList.remove('dragover');
+        });
+
+        uploadSection.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadSection.classList.remove('dragover');
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                handleFile(files[0]);
+            }
+        });
+
+        function handleFileSelect(e) {
+            const file = e.target.files[0];
+            if (file) {
+                handleFile(file);
+            }
+        }
+
+        function handleFile(file) {
+            if (file.type !== 'application/json' && !file.name.endsWith('.json')) {
+                showStatus('Ошибка: Выберите JSON файл', 'error');
+                return;
+            }
+
+            showStatus('Загрузка файла...', 'success');
+            uploadBtn.innerHTML = '<div class="loading"></div> Обработка...';
+            uploadBtn.disabled = true;
+
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                try {
+                    jsonData = JSON.parse(e.target.result);
+                    processData();
+                } catch (error) {
+                    showStatus('Ошибка при чтении JSON файла', 'error');
+                    resetUploadButton();
+                }
+            };
+            reader.readAsText(file);
+        }
+
+        function processData() {
+            try {
+                processedData = buildInitialRoutes(jsonData, settings);
+                displayResults();
+                showStatus('Файл успешно обработан!', 'success');
+            } catch (error) {
+                console.error('Ошибка обработки:', error);
+                showStatus('Ошибка при обработке данных', 'error');
+                resetUploadButton();
+            }
+        }
+
+        function buildInitialRoutes(data, settings) {
+            // Определяем формат данных: новый формат имеет result.routes, старый - просто routes
+            const isNewFormat = data.result && data.result.routes;
+            const routes = isNewFormat ? data.result.routes : (data.routes || []);
+            const initialRoutes = [];
+
+            // Группируем маршруты по vehicle_id для определения первого рейса каждого ТС
+            const vehicleFirstRoutes = new Map();
+
+            for (let routeIndex = 0; routeIndex < routes.length; routeIndex++) {
+                const routeEntry = routes[routeIndex];
+                const vehicleId = routeEntry.vehicle_id;
+
+                if (vehicleId && !vehicleFirstRoutes.has(vehicleId)) {
+                    vehicleFirstRoutes.set(vehicleId, routeIndex);
+                }
+            }
+
+            for (let routeIndex = 0; routeIndex < routes.length; routeIndex++) {
+                const routeEntry = routes[routeIndex];
+                const routeNodes = routeEntry.route || [];
+                const shift = routeEntry.shift || {};
+                const vehicleId = routeEntry.vehicle_id;
+                const runNumber = routeEntry.run_number;
+                const runDepotId = routeEntry.run_depot_id;
+
+                if (!routeNodes.length) continue;
+
+                // Собираем порядок заказов по порядку появления location-нод
+                const pickedOrders = [];
+                const convertedRoute = [];
+                const isFirstRouteForVehicle = vehicleId && vehicleFirstRoutes.get(vehicleId) === routeIndex;
+
+                for (let idx = 0; idx < routeNodes.length; idx++) {
+                    const stop = routeNodes[idx];
+                    const node = stop.node || {};
+                    const nodeType = node.type;
+                    const value = node.value || {};
+
+                    // Определяем fixed_position в зависимости от настроек
+                    let fixedPosition = false;
+                    if (settings.fixRoutes) {
+                        if (settings.fixMode === 'all') {
+                            fixedPosition = true;
+                        } else if (settings.fixMode === 'first' && isFirstRouteForVehicle) {
+                            fixedPosition = true;
+                        }
+                    }
+
+                    const nodeData = {
+                        node: {
+                            type: nodeType,
+                            value: {
+                                id: String(value.id || ''),
+                                fixed_position: fixedPosition
+                            }
+                        }
+                    };
+
+                    // Добавляем undroppable если включено
+                    if (settings.makeUndroppable) {
+                        nodeData.node.value.undroppable = true;
+                    }
+
+                    // Переносим времена прибытия/убытия если включено
+                    if (settings.transferTimes && (nodeType === 'depot' || nodeType === 'location')) {
+                        if (stop.arrival_time_s != null) {
+                            const timeKey = settings.timesMode === 'actual' ? 'actual_arrival_time_s' : 'arrival_time_s';
+                            nodeData[timeKey] = stop.arrival_time_s;
+                        }
+                        if (stop.departure_time_s != null) {
+                            const timeKey = settings.timesMode === 'actual' ? 'actual_departure_time_s' : 'departure_time_s';
+                            nodeData[timeKey] = stop.departure_time_s;
+                        }
+                    }
+
+                    // Добавляем времена для первого депота только если включена настройка fixStartTime
+                    if (settings.fixStartTime && nodeType === 'depot' && idx === 0) {
+                        if (isFirstRouteForVehicle) {
+                            // Для первого рейса каждого ТС: actual_ времена
+                            if (stop.arrival_time_s != null) {
+                                nodeData.actual_arrival_time_s = stop.arrival_time_s;
+                            }
+                            if (stop.departure_time_s != null) {
+                                nodeData.actual_departure_time_s = stop.departure_time_s;
+                            }
+                        } else {
+                            // Для второго и последующих рейсов каждого ТС: обычные времена
+                            if (stop.arrival_time_s != null) {
+                                nodeData.arrival_time_s = stop.arrival_time_s;
+                            }
+                            if (stop.departure_time_s != null) {
+                                nodeData.departure_time_s = stop.departure_time_s;
+                            }
+                        }
+                    }
+
+                    if (nodeType === 'depot') {
+                        const depotId = value.id;
+                        convertedRoute.push(nodeData);
+                    } else if (nodeType === 'location') {
+                        const orderId = value.id;
+                        if (orderId != null) {
+                            pickedOrders.push(String(orderId));
+                            convertedRoute.push(nodeData);
+                        }
+                    } else if (nodeType === 'break') {
+                        convertedRoute.push({
+                            node: {
+                                type: 'break',
+                                value: value
+                            }
+                        });
+                    }
+                }
+
+                // Обновляем первый depot нод, добавляя picked_orders
+                for (const item of convertedRoute) {
+                    const n = item.node || {};
+                    if (n.type === 'depot') {
+                        const val = n.value || {};
+                        if (!val.id && runDepotId) {
+                            val.id = String(runDepotId);
+                        }
+                        val.picked_orders = pickedOrders;
+                        break;
+                    }
+                }
+
+                // ВАЖНО: НЕ добавляем завершающий depot искусственно!
+                // Depot добавляется только если он уже был в исходном route
+
+                // Добавляем параметры фиксации в каждую ноду если они включены
+                if (settings.fixVehicle && vehicleId) {
+                    convertedRoute.forEach(item => {
+                        if (item.node && item.node.value) {
+                            item.node.value.fixed_vehicle = true;
+                        }
+                    });
+                }
+                if (settings.fixShift && shift.id) {
+                    convertedRoute.forEach(item => {
+                        if (item.node && item.node.value) {
+                            item.node.value.fixed_shift = true;
+                        }
+                    });
+                }
+                if (settings.fixRun) {
+                    convertedRoute.forEach(item => {
+                        if (item.node && item.node.value) {
+                            item.node.value.fixed_run = true;
+                        }
+                    });
+                }
+
+                const routeData = {
+                    route: convertedRoute,
+                    run_number: runNumber,
+                    shift: shift.id ? { id: String(shift.id) } : {},
+                    vehicle_id: vehicleId ? String(vehicleId) : null
+                };
+
+                initialRoutes.push(routeData);
+            }
+
+            return { initial_routes: initialRoutes };
+        }
+
+        function displayResults() {
+            // Статистика
+            const routeCount = processedData.initial_routes.length;
+            const totalLocations = processedData.initial_routes.reduce((sum, route) => {
+                return sum + route.route.filter(item => item.node.type === 'location').length;
+            }, 0);
+            const totalDepots = processedData.initial_routes.reduce((sum, route) => {
+                return sum + route.route.filter(item => item.node.type === 'depot').length;
+            }, 0);
+
+            stats.innerHTML = `
+                <div class="stat-card">
+                    <div class="stat-number">${routeCount}</div>
+                    <div class="stat-label">Маршрутов</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number">${totalLocations}</div>
+                    <div class="stat-label">Заказов</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number">${totalDepots}</div>
+                    <div class="stat-label">Депотов</div>
+                </div>
+            `;
+
+            // JSON результат
+            jsonEditor.set(processedData);
+            settingsSection.style.display = 'block';
+            resultSection.style.display = 'block';
+
+            resetUploadButton();
+        }
+
+
+        function showStatus(message, type) {
+            status.textContent = message;
+            status.className = `status ${type}`;
+            status.style.display = 'block';
+        }
+
+        function resetUploadButton() {
+            uploadBtn.innerHTML = 'Выбрать файл';
+            uploadBtn.disabled = false;
+        }
+
+        // Скачивание файла
+        downloadBtn.addEventListener('click', () => {
+            if (!processedData) return;
+
+            const dataStr = JSON.stringify(processedData, null, 2);
+            const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr);
+
+            const exportFileDefaultName = 'initial_routes.json';
+
+            const linkElement = document.createElement('a');
+            linkElement.setAttribute('href', dataUri);
+            linkElement.setAttribute('download', exportFileDefaultName);
+            linkElement.click();
+        });
+
+        // Копирование в буфер
+        copyBtn.addEventListener('click', async () => {
+            if (!processedData) return;
+
+            try {
+                await navigator.clipboard.writeText(JSON.stringify(processedData, null, 2));
+                const originalText = copyBtn.innerHTML;
+                copyBtn.innerHTML = '✓ Скопировано!';
+                setTimeout(() => {
+                    copyBtn.innerHTML = originalText;
+                }, 2000);
+            } catch (err) {
+                console.error('Ошибка копирования:', err);
+                alert('Ошибка копирования в буфер обмена');
+            }
+        });
+    </script>
+</body>
+</html>

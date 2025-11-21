@@ -767,7 +767,7 @@
                     route: convertedRoute,
                     run_number: runNumber,
                     shift: shift.id ? { id: String(shift.id) } : {},
-                    vehicle_id: vehicleId ? String(vehicleId) : null
+                    vehicle_id: vehicleId ?? null
                 };
 
                 initialRoutes.push(routeData);

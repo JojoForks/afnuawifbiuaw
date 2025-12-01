@@ -531,6 +531,10 @@
 
 		if (planningData) {
 			const updatedPlanning = JSON.parse(JSON.stringify(planningData));
+			// Создаём options если его нет
+			if (!updatedPlanning.options) {
+				updatedPlanning.options = {};
+			}
 			updatedPlanning.options.incompatible_zones = incompatibleExport;
 			updatedPlanning.options.compatible_zones = compatibleExport;
 			downloadJsonFile(updatedPlanning, 'planning.json');
@@ -586,26 +590,15 @@
 
 	function buildIncompatibleExport() {
 		const result = [];
-		const usedPairs = new Set();
 		const zones = allZoneNames.slice().sort();
 		
-		const pairKey = (a, b) => {
-			const x = a < b ? a : b;
-			const y = a < b ? b : a;
-			return x + '|' + y;
-		};
-
-		// Экспортируем пары несовместимых зон из adjacencyGlobal
-		zones.forEach(a => {
-			const incompatible = Array.from((adjacencyGlobal.get(a) || new Set())).filter(b => a < b).sort();
-			incompatible.forEach(b => {
-				const key = pairKey(a, b);
-				if (!usedPairs.has(key)) {
-					result.push([a, b]);
-					usedPairs.add(key);
-				}
-			});
-		});
+		// Экспортируем ВСЕ возможные пары зон как базово несовместимые
+		// compatible_zones затем переопределит исключения
+		for (let i = 0; i < zones.length; i++) {
+			for (let j = i + 1; j < zones.length; j++) {
+				result.push([zones[i], zones[j]]);
+			}
+		}
 
 		return result;
 	}

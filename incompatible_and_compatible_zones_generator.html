@@ -589,18 +589,10 @@
 		}
 
 	function buildIncompatibleExport() {
-		const result = [];
-		const zones = allZoneNames.slice().sort();
-		
-		// Экспортируем ВСЕ возможные пары зон как базово несовместимые
+		// Экспортируем ВСЕ зоны одним массивом как базово несовместимые между собой
 		// compatible_zones затем переопределит исключения
-		for (let i = 0; i < zones.length; i++) {
-			for (let j = i + 1; j < zones.length; j++) {
-				result.push([zones[i], zones[j]]);
-			}
-		}
-
-		return result;
+		const zones = allZoneNames.slice().sort();
+		return [zones];
 	}
 
 	function buildCompatibleExport() {

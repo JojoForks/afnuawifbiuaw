@@ -1,0 +1,774 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Редактор Геозон (NovaBev)</title>
+    
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+    
+    <!-- Leaflet-Geoman CSS (for editing) -->
+    <link rel="stylesheet" href="https://unpkg.com/@geoman-io/leaflet-geoman-free@latest/dist/leaflet-geoman.css" />
+
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            background-color: #f3f4f6;
+        }
+
+        header {
+            background-color: #ffffff;
+            padding: 0.75rem 1.5rem;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            z-index: 1000;
+            box-sizing: border-box;
+            height: 70px;
+        }
+
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        h1 {
+            margin: 0;
+            font-size: 1.1rem;
+            color: #111827;
+            font-weight: 700;
+            white-space: nowrap;
+        }
+
+        .controls {
+            display: flex;
+            gap: 0.75rem;
+            align-items: center;
+        }
+
+        .input-group {
+            display: flex;
+            align-items: center;
+        }
+        
+        .url-input {
+            padding: 0.5rem;
+            border: 1px solid #d1d5db;
+            border-radius: 0.375rem 0 0 0.375rem;
+            width: 250px;
+            font-size: 0.9rem;
+            outline: none;
+        }
+        .url-input:focus {
+            border-color: #2563eb;
+        }
+        
+        .btn {
+            padding: 0.5rem 1rem;
+            border-radius: 0.375rem;
+            font-weight: 500;
+            cursor: pointer;
+            border: none;
+            transition: background-color 0.2s;
+            white-space: nowrap;
+            font-size: 0.9rem;
+        }
+
+        .btn-load {
+            border-radius: 0 0.375rem 0.375rem 0;
+            background-color: #4b5563;
+            color: white;
+        }
+        .btn-load:hover { background-color: #374151; }
+
+        .btn-primary {
+            background-color: #2563eb;
+            color: white;
+        }
+        .btn-primary:hover { background-color: #1d4ed8; }
+
+        .btn-success {
+            background-color: #10b981;
+            color: white;
+        }
+        .btn-success:hover { background-color: #059669; }
+
+        .file-label {
+            display: inline-block;
+            padding: 0.5rem 1rem;
+            background-color: #fff;
+            border: 1px solid #d1d5db;
+            border-radius: 0.375rem;
+            cursor: pointer;
+            color: #374151;
+            font-weight: 500;
+            font-size: 0.9rem;
+        }
+        .file-label:hover { background-color: #f9fafb; }
+
+        /* Layout */
+        .main-container {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+        }
+
+        #sidebar {
+            width: 320px;
+            background: white;
+            border-right: 1px solid #e5e7eb;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        #sidebar-header {
+            padding: 15px;
+            background: #f9fafb;
+            border-bottom: 1px solid #e5e7eb;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        #sidebar-header h2 {
+            margin: 0;
+            font-size: 1rem;
+            color: #374151;
+        }
+
+        #sidebar-actions {
+            padding: 10px 15px;
+            border-bottom: 1px solid #e5e7eb;
+        }
+
+        #zone-list {
+            flex: 1;
+            overflow-y: auto;
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+
+        .zone-item {
+            display: flex;
+            align-items: center;
+            padding: 8px 15px;
+            border-bottom: 1px solid #f3f4f6;
+            cursor: pointer;
+            transition: background-color 0.1s;
+        }
+
+        .zone-item:hover {
+            background-color: #f9fafb;
+        }
+
+        .zone-item.active {
+            background-color: #eff6ff;
+            border-left: 4px solid #2563eb;
+            padding-left: 11px; /* Compensate border */
+        }
+
+        .zone-info {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            overflow: hidden;
+        }
+
+        .zone-color {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 10px;
+            flex-shrink: 0;
+        }
+
+        .zone-name {
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            font-size: 0.9rem;
+            color: #374151;
+        }
+
+        .item-actions {
+            display: flex;
+            gap: 5px;
+            opacity: 0.5;
+            transition: opacity 0.2s;
+        }
+        .zone-item:hover .item-actions {
+            opacity: 1;
+        }
+
+        .action-icon {
+            padding: 4px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 1rem;
+        }
+        .action-icon:hover {
+            background-color: #e5e7eb;
+        }
+
+        #map-container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+        }
+
+        #map {
+            flex: 1;
+            z-index: 1;
+        }
+
+        #status {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 10px 20px;
+            border-radius: 30px;
+            font-size: 0.9rem;
+            opacity: 0;
+            transition: opacity 0.3s;
+            pointer-events: none;
+            z-index: 2000;
+        }
+        
+        .loading-overlay {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(255,255,255,0.7);
+            z-index: 3000;
+            display: none;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+        }
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #3498db;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style>
+</head>
+<body>
+
+    <header>
+        <div class="header-left">
+            <h1>Редактор Зон</h1>
+        </div>
+        <div class="controls">
+            <!-- URL Input -->            
+            <div style="border-left: 1px solid #d1d5db; height: 24px; margin: 0 5px;"></div>
+
+            <!-- File Input -->
+            <label for="file-input" class="file-label">📂 Файл</label>
+            <input type="file" id="file-input" accept=".json,.geojson" style="display:none;">
+            
+            <button onclick="saveFile()" class="btn btn-primary">💾 Сохранить</button>
+        </div>
+    </header>
+
+    <div class="main-container">
+        <aside id="sidebar">
+            <div id="sidebar-header">
+                <h2>Список Зон</h2>
+                <span id="zone-count" style="font-weight: normal; color: #6b7280; font-size: 0.9rem;">0</span>
+            </div>
+            <div id="sidebar-actions">
+                <button onclick="createNewZone()" class="btn btn-success" style="width: 100%; padding: 6px;">+ Новая зона</button>
+            </div>
+            <ul id="zone-list">
+                <li style="padding: 20px; text-align: center; color: #9ca3af;">Нет зон</li>
+            </ul>
+        </aside>
+        
+        <div id="map-container">
+            <div id="map"></div>
+            <div id="status">Статус</div>
+        </div>
+    </div>
+    
+    <div id="loading-overlay" class="loading-overlay">
+        <div class="spinner"></div>
+        <div style="margin-top: 10px; color: #555; font-weight: 600;">Загрузка данных...</div>
+    </div>
+
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    <!-- Leaflet-Geoman JS -->
+    <script src="https://unpkg.com/@geoman-io/leaflet-geoman-free@latest/dist/leaflet-geoman.min.js"></script>
+
+    <script>
+        // --- Initialization ---
+        const map = L.map('map').setView([59.9343, 30.3351], 10);
+
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
+            subdomains: 'abcd',
+            maxZoom: 20
+        }).addTo(map);
+
+        map.pm.addControls({
+            position: 'topleft',
+            drawCircle: false,
+            drawCircleMarker: false,
+            drawMarker: false,
+            drawPolyline: false,
+            drawRectangle: true,
+            drawPolygon: true,
+            editMode: true,
+            dragMode: true,
+            cutPolygon: false,
+            removalMode: true,
+        });
+
+        map.pm.setLang('ru');
+
+        // --- State Management ---
+        let originalData = { zones: [] }; // Default empty structure
+        let inputType = 'custom'; 
+        let layersMap = new Map(); // Layer ID -> Data Object (reference)
+        let layerToListMap = new Map(); // Layer ID -> List Item Element
+
+        function isAnyLayerInEditMode() {
+             let isEditing = false;
+             map.eachLayer(l => {
+                 if (l.pm && l.pm.enabled()) isEditing = true;
+             });
+             return isEditing || map.pm.globalDrawModeEnabled();
+        }
+
+        // --- Events ---
+
+        // Map created layer (User draws new shape)
+        map.on('pm:create', e => {
+            const layer = e.layer;
+            const shape = e.shape;
+            
+            // Only register if it's a supported shape
+            if (shape === 'Polygon' || shape === 'Rectangle') {
+                const name = "Новая зона " + (layersMap.size + 1);
+                const id = "zone_" + Date.now();
+                
+                const newZone = {
+                    id: id,
+                    // Don't store 'name' in the data object for custom format if not needed
+                    // We will handle display name in UI separately
+                    geometry: layer.toGeoJSON().geometry
+                };
+                
+                // Add to originalData immediately if we are in custom mode
+                if (inputType === 'custom') {
+                    if (!originalData.zones) originalData.zones = [];
+                    layersMap.set(L.stamp(layer), newZone);
+                }
+
+                // Setup UI
+                const color = getRandomColor(layersMap.size);
+                layer.setStyle({ color: color, fillOpacity: 0.3 });
+                
+                // Add to sidebar
+                addToSidebar(layer, name, color);
+                
+                // Bind click
+                layer.on('click', (e) => {
+                    handleZoneClick(layer);
+                });
+
+                // Auto-select
+                const li = layerToListMap.get(L.stamp(layer));
+                if (li) selectZone(layer, li);
+                
+                updateZoneCount();
+            }
+        });
+
+        // File Input
+        document.getElementById('file-input').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            setLoading(true);
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const json = JSON.parse(e.target.result);
+                    loadData(json);
+                    showStatus('Файл успешно загружен');
+                } catch (err) {
+                    console.error(err);
+                    alert('Ошибка при чтении JSON. Проверьте формат.');
+                } finally {
+                    setLoading(false);
+                }
+            };
+            reader.readAsText(file);
+        });
+
+        // --- Load from URL Logic ---
+        async function loadFromUrl() {
+            const input = document.getElementById('url-input').value.trim();
+            if (!input) return alert('Введите ссылку или UUID');
+
+            const uuidMatch = input.match(/([a-f0-9]+-[a-f0-9]+-[a-f0-9]+-[a-f0-9]+)/i);
+            
+            if (!uuidMatch) {
+                return alert('Не удалось найти UUID в строке. Проверьте формат.');
+            }
+            
+            const uuid = uuidMatch[0];
+            const apiUrl = `https://courier.yandex.ru/vrs/api/v1/log/request/${uuid}`;
+
+            setLoading(true);
+            showStatus(`Запрос данных: ${uuid}...`);
+
+            try {
+                const response = await fetch(apiUrl);
+                if (!response.ok) {
+                    throw new Error(`Ошибка сети: ${response.status}`);
+                }
+                const data = await response.json();
+                loadData(data);
+                showStatus('Данные успешно загружены из Yandex API');
+            } catch (err) {
+                console.error(err);
+                alert(`Ошибка загрузки: ${err.message}.\n\nЕсли вы запускаете файл локально, браузер может блокировать запрос (CORS). Попробуйте запустить через локальный сервер или загрузите JSON вручную.`);
+            } finally {
+                setLoading(false);
+            }
+        }
+
+        // --- Core Logic ---
+
+        function loadData(data) {
+            // Cleanup
+            map.eachLayer(layer => {
+                if (layer instanceof L.Path || layer instanceof L.Marker) map.removeLayer(layer);
+            });
+            layersMap.clear();
+            layerToListMap.clear();
+            document.getElementById('zone-list').innerHTML = '';
+            
+            originalData = data;
+
+            // Detection
+            if (data.type === 'FeatureCollection' && Array.isArray(data.features)) {
+                inputType = 'geojson';
+                loadGeoJSON(data);
+            } else if (data.zones && Array.isArray(data.zones)) {
+                inputType = 'custom'; // NovaBev / Yandex format
+                loadCustomFormat(data);
+            } else {
+                // Maybe it's just the raw array? Unlikely but handle if needed
+                alert('Формат не распознан. Ожидается GeoJSON или объект с полем "zones".');
+                return;
+            }
+            updateZoneCount();
+        }
+
+        function loadCustomFormat(data) {
+            const bounds = L.latLngBounds();
+            let hasLayers = false;
+
+            data.zones.forEach((zone, index) => {
+                if (zone.geometry && zone.geometry.coordinates) {
+                    const feature = {
+                        "type": "Feature",
+                        "properties": { ...zone, geometry: undefined }, 
+                        "geometry": zone.geometry
+                    };
+
+                    const color = getRandomColor(index);
+                    const layerGroup = L.geoJSON(feature, {
+                        style: { color: color, weight: 2, fillOpacity: 0.2 }
+                    });
+
+                    layerGroup.eachLayer(layer => {
+                        layer.addTo(map);
+                        const stamp = L.stamp(layer);
+                        
+                        layersMap.set(stamp, zone);
+                        bounds.extend(layer.getBounds());
+                        hasLayers = true;
+                        
+                        const name = getZoneName(zone);
+                        if (name) layer.bindTooltip(String(name));
+
+                        addToSidebar(layer, name, color);
+
+                        layer.on('click', () => handleZoneClick(layer));
+                    });
+                }
+            });
+
+            if (hasLayers) map.fitBounds(bounds);
+        }
+
+        function loadGeoJSON(data) {
+            let index = 0;
+            const geoJsonLayer = L.geoJSON(data, {
+                style: () => ({ color: getRandomColor(index++), weight: 2, fillOpacity: 0.2 }),
+                onEachFeature: (feature, layer) => {
+                    const stamp = L.stamp(layer);
+                    layersMap.set(stamp, feature); // Link to feature
+                    
+                    const name = getZoneName(feature);
+                    const color = layer.options.color || '#3388ff';
+                    
+                    if (name) layer.bindTooltip(String(name));
+                    addToSidebar(layer, name, color);
+                    
+                    layer.on('click', () => handleZoneClick(layer));
+                }
+            }).addTo(map);
+            
+            if (layersMap.size > 0) map.fitBounds(geoJsonLayer.getBounds());
+        }
+
+        function handleZoneClick(layer) {
+            if (layer.pm && layer.pm.enabled()) return;
+            if (isAnyLayerInEditMode()) return;
+
+            const li = layerToListMap.get(L.stamp(layer));
+            if (li) selectZone(layer, li);
+        }
+
+        // --- Sidebar & Interaction ---
+
+        function addToSidebar(layer, name, color) {
+            const list = document.getElementById('zone-list');
+            const stamp = L.stamp(layer);
+            const displayName = name || `Зона ${stamp}`;
+
+            const li = document.createElement('li');
+            li.className = 'zone-item';
+            li.id = `li-${stamp}`;
+            
+            li.innerHTML = `
+                <div class="zone-info">
+                    <div class="zone-color" style="background-color: ${color}"></div>
+                    <span class="zone-name" title="${displayName}">${displayName}</span>
+                </div>
+                <div class="item-actions">
+                    <span class="action-icon edit-name-btn" title="Переименовать">✏️</span>
+                    <span class="action-icon toggle-vis-btn" title="Скрыть/Показать">👁️</span>
+                </div>
+            `;
+
+            // Events
+            li.querySelector('.edit-name-btn').onclick = (e) => {
+                e.stopPropagation();
+                renameZone(layer, li);
+            };
+
+            li.querySelector('.toggle-vis-btn').onclick = (e) => {
+                e.stopPropagation();
+                const btn = e.target;
+                if (map.hasLayer(layer)) {
+                    map.removeLayer(layer);
+                    btn.style.opacity = '0.3';
+                    li.classList.add('hidden-zone');
+                } else {
+                    map.addLayer(layer);
+                    btn.style.opacity = '1';
+                    li.classList.remove('hidden-zone');
+                }
+            };
+
+            li.querySelector('.zone-info').onclick = () => {
+                selectZone(layer, li);
+            };
+
+            list.appendChild(li);
+            layerToListMap.set(stamp, li);
+        }
+
+        function selectZone(layer, liElement) {
+            document.querySelectorAll('.zone-item').forEach(el => el.classList.remove('active'));
+            if (liElement) liElement.classList.add('active');
+
+            map.pm.disableGlobalEditMode();
+            map.eachLayer(l => { if (l.pm && l !== layer) l.pm.disable(); });
+
+            if (map.hasLayer(layer)) {
+                map.flyToBounds(layer.getBounds(), { padding: [50, 50], duration: 0.5 });
+                if (layer.pm) layer.pm.enable({ allowSelfIntersection: false });
+            } else {
+                showStatus('Зона скрыта. Включите видимость для редактирования.');
+            }
+        }
+
+        function createNewZone() {
+            if (map.pm.globalDrawModeEnabled()) return;
+            map.eachLayer(l => { if (l.pm) l.pm.disable(); });
+            map.pm.enableDraw('Polygon', { snappable: true, snapDistance: 20 });
+            showStatus('Нарисуйте новую зону на карте...');
+        }
+
+        function renameZone(layer, liElement) {
+            const stamp = L.stamp(layer);
+            const dataObj = layersMap.get(stamp);
+            
+            const oldName = getZoneName(dataObj) || '';
+            const newName = prompt("Введите новое имя/ID зоны:", oldName);
+            
+            if (newName !== null && newName.trim() !== "") {
+                if (inputType === 'custom') {
+                     if (dataObj.id) dataObj.id = newName;
+                     else dataObj.name = newName;
+                     if (!dataObj.id && !dataObj.name) dataObj.id = newName;
+                } else {
+                    if (!dataObj.properties) dataObj.properties = {};
+                    dataObj.properties.name = newName;
+                    dataObj.properties.id = newName;
+                }
+
+                const nameSpan = liElement.querySelector('.zone-name');
+                nameSpan.textContent = newName;
+                nameSpan.title = newName;
+                
+                layer.unbindTooltip();
+                layer.bindTooltip(newName);
+                
+                showStatus('Зона переименована');
+            }
+        }
+
+        // --- Saving ---
+
+        function saveFile() {
+            if (!originalData) return alert('Нет данных для сохранения.');
+            
+            if (inputType === 'geojson') {
+                // GEOJSON Saving
+                const features = [];
+                map.eachLayer(layer => {
+                    if ((layer instanceof L.Polygon || layer instanceof L.Rectangle) && !layer.pm._enabled) {
+                         const stamp = L.stamp(layer);
+                         let feature = layersMap.get(stamp);
+                         const geo = layer.toGeoJSON();
+                         if (feature) {
+                             feature.geometry = geo.geometry;
+                             features.push(feature);
+                         } else {
+                             features.push(geo);
+                         }
+                    }
+                });
+                const output = { type: "FeatureCollection", features: features };
+                downloadJSON(output, "zones.geojson");
+
+            } else {
+                // CUSTOM FORMAT Saving (NovaBev)
+                const activeZones = [];
+                
+                map.eachLayer(layer => {
+                    if ((layer instanceof L.Polygon || layer instanceof L.Rectangle) && !layer.pm._enabled) {
+                        const stamp = L.stamp(layer);
+                        const geoJSON = layer.toGeoJSON();
+                        
+                        let zoneData = layersMap.get(stamp);
+                        
+                        // Create Ordered Object: geometry first, then id
+                        // This matches the user request to not have "ugly" json with id at top
+                        
+                        let newZoneObj = {};
+                        
+                        // 1. Geometry
+                        newZoneObj.geometry = geoJSON.geometry;
+                        
+                        // 2. ID and other props
+                        if (zoneData) {
+                            // Copy other properties manually to control order
+                            // ID is crucial
+                            if (zoneData.id) newZoneObj.id = zoneData.id;
+                            
+                            // Copy everything else except geometry/id/name
+                            for (const key in zoneData) {
+                                if (key !== 'geometry' && key !== 'id' && key !== 'name') {
+                                    newZoneObj[key] = zoneData[key];
+                                }
+                            }
+                        } else {
+                            // New zone fallback
+                            newZoneObj.id = "new_zone_" + Math.floor(Math.random()*10000);
+                        }
+                        
+                        activeZones.push(newZoneObj);
+                    }
+                });
+                
+                originalData.zones = activeZones;
+                downloadJSON(originalData, "updated_planning.json");
+            }
+        }
+
+        // --- Utils ---
+
+        function getZoneName(obj) {
+            if (!obj) return null;
+            if (obj.id) return obj.id;
+            if (obj.name) return obj.name;
+            if (obj.properties) {
+                if (obj.properties.name) return obj.properties.name;
+                if (obj.properties.id) return obj.properties.id;
+                if (obj.properties.title) return obj.properties.title;
+            }
+            return null;
+        }
+
+        function updateZoneCount() {
+             const count = document.querySelectorAll('#zone-list li.zone-item').length;
+             document.getElementById('zone-count').textContent = count;
+        }
+
+        function downloadJSON(data, filename) {
+            const blob = new Blob([JSON.stringify(data, null, 4)], { type: "application/json" });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            showStatus('Файл сохранен!');
+        }
+
+        function showStatus(msg) {
+            const el = document.getElementById('status');
+            el.textContent = msg;
+            el.style.opacity = 1;
+            setTimeout(() => el.style.opacity = 0, 4000);
+        }
+
+        function setLoading(isLoading) {
+            document.getElementById('loading-overlay').style.display = isLoading ? 'flex' : 'none';
+        }
+
+        function getRandomColor(index) {
+            const colors = ['#ef4444', '#f97316', '#f59e0b', '#84cc16', '#10b981', '#06b6d4', '#3b82f6', '#6366f1', '#8b5cf6', '#d946ef', '#f43f5e'];
+            return colors[index % colors.length];
+        }
+    </script>
+</body>
+</html>
+

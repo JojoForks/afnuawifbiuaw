@@ -294,10 +294,9 @@
 
 			await initializeMapOnly();
 			document.getElementById('workPanel').style.display = 'block';
-			// Небольшая задержка, чтобы браузер успел отрисовать элементы DOM и Leaflet смог пересчитать размер
 			await new Promise(resolve => setTimeout(resolve, 50));
 			if (map) {
-				map.invalidateSize(); // Принудительно обновляем размер карты
+				map.invalidateSize();
 			}
 
 			if (planningData) {
@@ -373,11 +372,7 @@
 				}
 			}
 
-		// Инвертируем: edges содержат близкие зоны, но мы хотим их как совместимые
-		// Поэтому сохраняем edges в selectedNeighborsByZone (совместимые)
 		selectedNeighborsByZone = edges;
-
-		// А несовместимости - это все остальные пары
 		adjacencyGlobal = new Map();
 		allZoneNames.forEach(a => adjacencyGlobal.set(a, new Set()));
 		for (let i = 0; i < allZoneNames.length; i++) {
@@ -392,7 +387,6 @@
 			}
 		}
 
-		// Перестраиваем компоненты и обновляем отображение
 		rebuildComponentsFromSelections();
 		clearAllStyles();
 
@@ -419,9 +413,6 @@
 					let incompatibleZones = [];
 					let compatibleZones = [];
 
-					// Поддержка форматов:
-					// 1) { options: { incompatible_zones, compatible_zones? } }
-					// 2) { incompatible_zones, compatible_zones? }
 					if (data && data.options && Array.isArray(data.options.incompatible_zones)) {
 						incompatibleZones = data.options.incompatible_zones;
 						if (Array.isArray(data.options.compatible_zones)) compatibleZones = data.options.compatible_zones;
@@ -433,21 +424,18 @@
 						return;
 					}
 
-					// Полный сброс: перезаписываем совместимости с нуля
 					selectedNeighborsByZone = new Map();
 					allZoneNames.forEach(name => {
 						selectedNeighborsByZone.set(name, new Set());
 					});
 
-					// Применение несовместимых зон
-					// 1) Построим несовместимости в adjacencyGlobal
 					adjacencyGlobal = new Map();
 					allZoneNames.forEach(name => adjacencyGlobal.set(name, new Set()));
 					for (let group of incompatibleZones) {
 						if (!Array.isArray(group)) continue;
 						if (group.length === 2) {
-							const a = String(group[0]).trim();
-							const b = String(group[1]).trim();
+							const a = String(group[0]);
+							const b = String(group[1]);
 							if (a && b && a !== b && adjacencyGlobal.has(a) && adjacencyGlobal.has(b)) {
 								adjacencyGlobal.get(a).add(b);
 								adjacencyGlobal.get(b).add(a);
@@ -455,8 +443,8 @@
 						} else if (group.length > 2) {
 							for (let i = 0; i < group.length; i++) {
 								for (let j = i + 1; j < group.length; j++) {
-									const a = String(group[i]).trim();
-									const b = String(group[j]).trim();
+									const a = String(group[i]);
+									const b = String(group[j]);
 									if (a && b && a !== b && adjacencyGlobal.has(a) && adjacencyGlobal.has(b)) {
 										adjacencyGlobal.get(a).add(b);
 										adjacencyGlobal.get(b).add(a);
@@ -466,10 +454,9 @@
 						}
 					}
 
-					// 2) Если нет compatible_zones — вычислим совместимости как дополнение к несовместимостям
-					if (!compatibleZones || compatibleZones.length === 0) {
-						selectedNeighborsByZone = new Map();
-						allZoneNames.forEach(a => selectedNeighborsByZone.set(a, new Set()));
+					if (compatibleZones && compatibleZones.length > 0) {
+						applyCompatibleFromPlanning(compatibleZones);
+					} else {
 						for (let i = 0; i < allZoneNames.length; i++) {
 							for (let j = i + 1; j < allZoneNames.length; j++) {
 								const a = allZoneNames[i];
@@ -483,12 +470,6 @@
 						}
 					}
 
-					// Применение совместимых зон (если есть) — добавляем только совместимости
-					let appliedCompatible = 0;
-					if (compatibleZones && compatibleZones.length) {
-						appliedCompatible = applyCompatibleFromPlanning(compatibleZones);
-					}
-
 					rebuildComponentsFromSelections();
 
 					alert(`Загружены несовместимые зоны из файла`);
@@ -499,8 +480,7 @@
 			};
 			reader.readAsText(file);
 
-			// Сброс input для возможности повторного выбора того же файла
-			e.target.value = '';
+					e.target.value = '';
 		});
 
 		document.getElementById('saveFormulaButton').addEventListener('click', () => {
@@ -531,7 +511,6 @@
 
 		if (planningData) {
 			const updatedPlanning = JSON.parse(JSON.stringify(planningData));
-			// Создаём options если его нет
 			if (!updatedPlanning.options) {
 				updatedPlanning.options = {};
 			}
@@ -588,9 +567,14 @@
 			return planningData.options.compatible_zones;
 		}
 
+		function extractIncompatibleGroupsFromPlanning() {
+			if (!planningData || !planningData.options || !planningData.options.incompatible_zones) {
+				return null;
+			}
+			return planningData.options.incompatible_zones;
+		}
+
 	function buildIncompatibleExport() {
-		// Экспортируем ВСЕ зоны одним массивом как базово несовместимые между собой
-		// compatible_zones затем переопределит исключения
 		const zones = allZoneNames.slice().sort();
 		return [zones];
 	}
@@ -599,17 +583,19 @@
 		const result = [];
 		const usedPairs = new Set();
 		const zones = allZoneNames.slice().sort();
-		const hasEdge = (a, b) => {
-			const setA = selectedNeighborsByZone.get(a) || new Set();
-			return setA.has(b);
-		};
+		
 		const pairKey = (a, b) => {
 			const x = a < b ? a : b;
 			const y = a < b ? b : a;
 			return x + '|' + y;
 		};
+		
+		const hasEdge = (a, b) => {
+			const setA = selectedNeighborsByZone.get(a);
+			if (!setA) return false;
+			return setA.has(b);
+		};
 
-		// 1) Ищем тройки-клики
 		for (let i = 0; i < zones.length; i++) {
 			for (let j = i + 1; j < zones.length; j++) {
 				for (let k = j + 1; k < zones.length; k++) {
@@ -625,38 +611,37 @@
 			}
 		}
 
-		// 2) Добавляем оставшиеся пары
-		zones.forEach(a => {
-			const neighbors = Array.from((selectedNeighborsByZone.get(a) || new Set())).filter(b => a < b).sort();
-			neighbors.forEach(b => {
+		for (let i = 0; i < zones.length; i++) {
+			for (let j = i + 1; j < zones.length; j++) {
+				const a = zones[i];
+				const b = zones[j];
 				const key = pairKey(a, b);
-				if (!usedPairs.has(key)) {
+				if (!usedPairs.has(key) && hasEdge(a, b)) {
 					result.push([a, b]);
 					usedPairs.add(key);
 				}
-			});
-		});
+			}
+		}
 
 		return result;
 	}
 
 		function applyCompatibleFromPlanning(groups) {
-			// Не очищаем selectedNeighborsByZone, а дополняем существующие связи
 			let applied = 0;
 			groups.forEach(group => {
 				if (!Array.isArray(group) || group.length < 2) return;
 				if (group.length === 2) {
-					const a = String(group[0]).trim();
-					const b = String(group[1]).trim();
+					const a = String(group[0]);
+					const b = String(group[1]);
 					if (a && b && a !== b && selectedNeighborsByZone.has(a) && selectedNeighborsByZone.has(b)) {
 						selectedNeighborsByZone.get(a).add(b);
 						selectedNeighborsByZone.get(b).add(a);
 						applied++;
 					}
 				} else if (group.length === 3) {
-					const a = String(group[0]).trim();
-					const b = String(group[1]).trim();
-					const c = String(group[2]).trim();
+					const a = String(group[0]);
+					const b = String(group[1]);
+					const c = String(group[2]);
 					const triples = [[a,b],[a,c],[b,c]];
 					triples.forEach(([x,y]) => {
 						if (x && y && x !== y && selectedNeighborsByZone.has(x) && selectedNeighborsByZone.has(y)) {
@@ -666,9 +651,9 @@
 						}
 					});
 				} else {
-					const center = String(group[0]).trim();
+					const center = String(group[0]);
 					for (let i = 1; i < group.length; i++) {
-						const other = String(group[i]).trim();
+						const other = String(group[i]);
 						if (center && other && center !== other && selectedNeighborsByZone.has(center) && selectedNeighborsByZone.has(other)) {
 							selectedNeighborsByZone.get(center).add(other);
 							selectedNeighborsByZone.get(other).add(center);
@@ -686,7 +671,6 @@
 				return;
 			}
 
-			// Преобразуем зоны из формата планирования в GeoJSON
 			const geojsonFeatures = planningData.zones.map(zone => ({
 				type: 'Feature',
 				geometry: zone.geometry,
@@ -713,6 +697,7 @@
 			selectedNeighborsByZone = new Map();
 
 			const planningCompatibleGroups = extractCompatibleGroupsFromPlanning();
+			const planningIncompatibleGroups = extractIncompatibleGroupsFromPlanning();
 
 			const features = normalizeFeatures(geojson);
 			if (!features || features.length === 0) {
@@ -729,15 +714,29 @@
 
 			allZoneNames = features.map(f => f.properties.description);
 
+			allZoneNames.forEach(name => {
+				selectedNeighborsByZone.set(name, new Set());
+				adjacencyGlobal.set(name, new Set());
+			});
+
+			if (planningIncompatibleGroups && planningIncompatibleGroups.length > 0) {
+				for (let group of planningIncompatibleGroups) {
+					if (!Array.isArray(group)) continue;
+					for (let i = 0; i < group.length; i++) {
+						for (let j = i + 1; j < group.length; j++) {
+							const a = String(group[i]).trim();
+							const b = String(group[j]).trim();
+							if (a && b && a !== b && adjacencyGlobal.has(a) && adjacencyGlobal.has(b)) {
+								adjacencyGlobal.get(a).add(b);
+								adjacencyGlobal.get(b).add(a);
+							}
+						}
+					}
+				}
+			}
+
 			if (planningCompatibleGroups && planningCompatibleGroups.length > 0) {
-				allZoneNames.forEach(name => {
-					selectedNeighborsByZone.set(name, new Set());
-				});
-				const appliedCount = applyCompatibleFromPlanning(planningCompatibleGroups);
-			} else {
-				allZoneNames.forEach(name => {
-					selectedNeighborsByZone.set(name, new Set());
-				});
+				applyCompatibleFromPlanning(planningCompatibleGroups);
 			}
 
 			rebuildComponentsFromSelections();
@@ -939,7 +938,7 @@
 			const a = parseFloat(document.getElementById('coefficientInput').value) || 0.166;
 			const mTermValue = Math.max(0, numZones - 1);
 			const inner = Math.max(Math.min(mTermValue, zonesForMaxPenalty) - (penaltyStartZone - 1), 0);
-			if (inner <= 0) return 0; // Если inner <= 0, то штрафа нет
+			if (inner <= 0) return 0;
 			const penalty = cost * ((1 - a) / a) * (1 / (1 - a * inner) - 1);
 			return Math.max(0, penalty);
 		}

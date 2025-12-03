@@ -201,7 +201,10 @@
 		</div>
 
 		<div class="group">
+			<label for="penaltyValueInput">Штраф за несовместимость:</label>
+			<input type="number" id="penaltyValueInput" value="1000000000" min="1" style="width: 200px; margin-bottom: 1rem;"><br>
 			<button id="saveResultButton">Сохранить результат</button>
+			<button id="saveCostFormulaButton" style="margin-left:12px;">Сохранить формулу несовместимостей</button>
 			<button id="selectAnotherFileButton" style="margin-left:12px;">Выбрать другой файл</button>
 		</div>
 	</div>
@@ -526,6 +529,16 @@
 		}
 	});
 
+	document.getElementById('saveCostFormulaButton').addEventListener('click', () => {
+		rebuildComponentsFromSelections();
+		const incompatibleExport = buildIncompatibleExport();
+		const compatibleExport = buildCompatibleExport();
+		const penalty = parseFloat(document.getElementById('penaltyValueInput').value) || 1000000000;
+		
+		const formula = buildIncompatibilityCostFormula(incompatibleExport, compatibleExport, penalty);
+		downloadJsonFile({ cost: formula }, 'incompatibility_cost_formula.json');
+	});
+
 		document.getElementById('selectAnotherFileButton').addEventListener('click', () => {
 			resetToFileSelection();
 		});
@@ -624,6 +637,57 @@
 		}
 
 		return result;
+	}
+
+	function buildIncompatibilityCostFormula(incompatibleZones, compatibleZones, penalty) {
+		const pairKey = (a, b) => {
+			const x = a < b ? a : b;
+			const y = a < b ? b : a;
+			return x + '|' + y;
+		};
+
+		const incompPairs = new Set();
+		for (const group of incompatibleZones) {
+			if (!Array.isArray(group)) continue;
+			const names = [...new Set(group.map(s => String(s)))];
+			for (let i = 0; i < names.length; i++) {
+				for (let j = i + 1; j < names.length; j++) {
+					incompPairs.add(pairKey(names[i], names[j]));
+				}
+			}
+		}
+
+		const compPairs = new Set();
+		for (const group of compatibleZones) {
+			if (!Array.isArray(group)) continue;
+			const names = [...new Set(group.map(s => String(s)))];
+			for (let i = 0; i < names.length; i++) {
+				for (let j = i + 1; j < names.length; j++) {
+					compPairs.add(pairKey(names[i], names[j]));
+				}
+			}
+		}
+
+		const conflicts = [];
+		for (const pair of incompPairs) {
+			if (!compPairs.has(pair)) {
+				conflicts.push(pair);
+			}
+		}
+		conflicts.sort();
+
+		if (conflicts.length === 0) {
+			return "0";
+		}
+
+		const exprs = conflicts.map(pair => {
+			const [a, b] = pair.split('|');
+			const aEsc = a.replace(/'/g, "\\'");
+			const bEsc = b.replace(/'/g, "\\'");
+			return `(has_location(in_zone('${aEsc}')) & has_location(in_zone('${bEsc}')))`;
+		});
+
+		return `bool(${exprs.join(' | ')}) * ${penalty}`;
 	}
 
 		function applyCompatibleFromPlanning(groups) {

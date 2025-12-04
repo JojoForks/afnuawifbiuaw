@@ -422,8 +422,16 @@
 					} else if (data && Array.isArray(data.incompatible_zones)) {
 						incompatibleZones = data.incompatible_zones;
 						if (Array.isArray(data.compatible_zones)) compatibleZones = data.compatible_zones;
+					} else if (data && typeof data.cost === 'string') {
+						const pairs = parseCostFormula(data.cost);
+						if (pairs.length > 0) {
+							incompatibleZones = pairs;
+						} else {
+							alert('Не удалось распарсить формулу cost.');
+							return;
+						}
 					} else {
-						alert('Неверный формат файла. Ожидается массив incompatible_zones.');
+						alert('Неверный формат файла. Ожидается массив incompatible_zones или формула cost.');
 						return;
 					}
 
@@ -637,6 +645,20 @@
 		}
 
 		return result;
+	}
+
+	function parseCostFormula(formula) {
+		const pairs = [];
+		const regex = /has_(?:order|location)\(in_zone\('([^']+)'\)\)\s*&\s*has_(?:order|location)\(in_zone\('([^']+)'\)\)/g;
+		let match;
+		while ((match = regex.exec(formula)) !== null) {
+			const a = match[1].replace(/\\'/g, "'");
+			const b = match[2].replace(/\\'/g, "'");
+			if (a && b && a !== b) {
+				pairs.push([a, b]);
+			}
+		}
+		return pairs;
 	}
 
 	function buildIncompatibilityCostFormula(incompatibleZones, compatibleZones, penalty) {

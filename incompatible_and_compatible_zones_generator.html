@@ -684,10 +684,10 @@
 			const [a, b] = pair.split('|');
 			const aEsc = a.replace(/'/g, "\\'");
 			const bEsc = b.replace(/'/g, "\\'");
-			return `(has_location(in_zone('${aEsc}')) & has_location(in_zone('${bEsc}')))`;
+			return `(has_order(in_zone('${aEsc}')) & has_order(in_zone('${bEsc}')))`;
 		});
 
-		return `bool(${exprs.join(' | ')}) * ${penalty}`;
+		return `(${exprs.join(' | ')}) * ${penalty}`;
 	}
 
 		function applyCompatibleFromPlanning(groups) {

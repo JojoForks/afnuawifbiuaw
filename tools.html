@@ -1,0 +1,437 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RouteQ Tools</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f8fafc;
+            color: #334155;
+            height: 100vh;
+            display: flex;
+            overflow: hidden;
+        }
+
+        .sidebar {
+            width: 280px;
+            background: #fff;
+            border-right: 1px solid #e2e8f0;
+            display: flex;
+            flex-direction: column;
+            flex-shrink: 0;
+            transition: width 0.2s;
+        }
+
+        .sidebar.collapsed {
+            width: 100px;
+        }
+
+        .sidebar-header {
+            padding: 16px;
+            border-bottom: 1px solid #e2e8f0;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            min-height: 60px;
+        }
+
+        .sidebar-logo {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            overflow: hidden;
+        }
+
+        .sidebar-logo-icon {
+            font-size: 1.5rem;
+            flex-shrink: 0;
+        }
+
+        .sidebar-logo-text {
+            font-size: 1.125rem;
+            font-weight: 600;
+            color: #1e293b;
+            white-space: nowrap;
+        }
+
+        .sidebar.collapsed .sidebar-logo-text,
+        .sidebar.collapsed .sidebar-link,
+        .sidebar.collapsed .sidebar-logo {
+            display: none;
+        }
+
+        .sidebar.collapsed .sidebar-header {
+            justify-content: center;
+        }
+
+        .sidebar-link {
+            display: block;
+            font-size: 0.7rem;
+            color: #64748b;
+            text-decoration: none;
+            margin-top: 4px;
+        }
+
+        .sidebar-link:hover {
+            color: #475569;
+        }
+
+        .toggle-btn {
+            width: 32px;
+            height: 32px;
+            border: none;
+            background: #f1f5f9;
+            border-radius: 6px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1rem;
+            color: #64748b;
+            flex-shrink: 0;
+            transition: background 0.15s;
+        }
+
+        .toggle-btn:hover {
+            background: #e2e8f0;
+            color: #475569;
+        }
+
+        .nav {
+            flex: 1;
+            overflow-y: auto;
+            padding: 8px;
+        }
+
+        .nav-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 10px 12px;
+            border-radius: 8px;
+            color: #475569;
+            text-decoration: none;
+            font-size: 0.875rem;
+            cursor: pointer;
+            transition: all 0.15s;
+            margin-bottom: 4px;
+        }
+
+        .nav-item:hover {
+            background: #f1f5f9;
+            color: #1e293b;
+        }
+
+        .nav-item.active {
+            background: #3b82f6;
+            color: #fff;
+        }
+
+        .nav-item-icon {
+            font-size: 1.25rem;
+            flex-shrink: 0;
+            width: 28px;
+            text-align: center;
+        }
+
+        .nav-item-content {
+            overflow: hidden;
+            min-width: 0;
+        }
+
+        .sidebar.collapsed .nav-item-content {
+            display: none;
+        }
+
+        .sidebar.collapsed .nav-item {
+            justify-content: center;
+            padding: 12px;
+        }
+
+        .nav-item-title {
+            font-weight: 500;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .nav-item-short {
+            display: none;
+            font-size: 0.65rem;
+            margin-top: 2px;
+            text-align: center;
+        }
+
+        .sidebar.collapsed .nav-item-short {
+            display: block;
+        }
+
+        .sidebar.collapsed .nav-item-icon {
+            width: auto;
+        }
+
+        .nav-item-desc {
+            font-size: 0.75rem;
+            opacity: 0.7;
+            line-height: 1.3;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+
+        .content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            background: #f8fafc;
+            position: relative;
+        }
+
+        .iframe-container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            display: none;
+        }
+
+        .iframe-container.active {
+            display: block;
+        }
+
+        .iframe-container iframe {
+            width: 100%;
+            height: 100%;
+            border: none;
+            background: #fff;
+        }
+
+        .empty-state {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            color: #64748b;
+        }
+
+        .empty-state-icon {
+            font-size: 4rem;
+            margin-bottom: 20px;
+            opacity: 0.6;
+        }
+
+        .empty-state-text {
+            font-size: 1.125rem;
+            margin-bottom: 8px;
+            color: #475569;
+        }
+
+        .empty-state-hint {
+            font-size: 0.875rem;
+            color: #64748b;
+        }
+
+        .loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 12px;
+            color: #64748b;
+        }
+
+        .spinner {
+            width: 32px;
+            height: 32px;
+            border: 3px solid #e2e8f0;
+            border-top-color: #3b82f6;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .iframe-container.loaded .loading {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <aside class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+            <div class="sidebar-logo">
+                <span class="sidebar-logo-icon">🛣️</span>
+                <div>
+                    <div class="sidebar-logo-text">RouteQ Tools</div>
+                    <a class="sidebar-link" href="https://github.com/JojoForks/afnuawifbiuaw" target="_blank">GitHub</a>
+                </div>
+            </div>
+            <button class="toggle-btn" id="toggleBtn" title="Свернуть меню">◀</button>
+        </div>
+        <nav class="nav" id="nav"></nav>
+    </aside>
+
+    <main class="content" id="content">
+        <div class="empty-state" id="emptyState">
+            <div class="empty-state-icon">🛠️</div>
+            <div class="empty-state-text">Выберите инструмент</div>
+            <div class="empty-state-hint">Нажмите на пункт меню слева</div>
+        </div>
+    </main>
+
+    <script>
+        const tools = [
+            {
+                id: 'zones',
+                icon: '🧩',
+                short: 'Совм. Зон',
+                title: 'Совместимость зон',
+                desc: 'Формирование совместимых и несовместимых зон',
+                url: 'incompatible_and_compatible_zones_generator.html'
+            },
+            {
+                id: 'optimize',
+                icon: '📦',
+                short: 'Опт. GeoJSON',
+                title: 'Оптимизация GeoJSON',
+                desc: 'Уменьшение размера файла',
+                url: 'optimize_geojson.html'
+            },
+            {
+                id: 'magnetize',
+                icon: '🧲',
+                short: 'Магнит зон',
+                title: 'Примагнитить зоны',
+                desc: 'Убрать промежутки между полигонами',
+                url: 'magnetize_polygons.html'
+            },
+            {
+                id: 'excel',
+                icon: '📊',
+                short: 'Разбить ячейки',
+                title: 'Разъеденить ячейки',
+                desc: 'Разъединить объедененные ячейки с заполнением',
+                url: 'excel_unmerge.html'
+            },
+            {
+                id: 'routes',
+                icon: '🚛',
+                short: 'Initial Routes',
+                title: 'Генерация Initial Routes',
+                desc: 'Генерация Initial Routes из Response',
+                url: 'initial_routes_gen.html'
+            },
+            {
+                id: 'editor',
+                icon: '✏️',
+                short: 'Ред. зон',
+                title: 'Редактор зон',
+                desc: 'Редактирование зон в планировании',
+                url: 'mvrp_zones_editor.html'
+            }
+        ];
+
+        const sidebar = document.getElementById('sidebar');
+        const toggleBtn = document.getElementById('toggleBtn');
+        const nav = document.getElementById('nav');
+        const content = document.getElementById('content');
+        const emptyState = document.getElementById('emptyState');
+        const loadedFrames = {};
+        let currentTool = null;
+
+        toggleBtn.onclick = () => {
+            sidebar.classList.toggle('collapsed');
+            const isCollapsed = sidebar.classList.contains('collapsed');
+            toggleBtn.textContent = isCollapsed ? '▶' : '◀';
+            
+            const url = new URL(window.location);
+            if (isCollapsed) {
+                url.searchParams.set('collapsed', 'true');
+            } else {
+                url.searchParams.delete('collapsed');
+            }
+            history.replaceState(null, '', url);
+        };
+
+        tools.forEach(tool => {
+            const item = document.createElement('div');
+            item.className = 'nav-item';
+            item.dataset.id = tool.id;
+            item.innerHTML = `
+                <div class="nav-item-icon">${tool.icon}<div class="nav-item-short">${tool.short}</div></div>
+                <div class="nav-item-content">
+                    <div class="nav-item-title">${tool.title}</div>
+                    <div class="nav-item-desc">${tool.desc}</div>
+                </div>
+            `;
+            item.onclick = () => selectTool(tool.id);
+            nav.appendChild(item);
+        });
+
+        function selectTool(id) {
+            const tool = tools.find(t => t.id === id);
+            if (!tool) return;
+
+            document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+            document.querySelector(`.nav-item[data-id="${id}"]`).classList.add('active');
+
+            document.querySelectorAll('.iframe-container').forEach(el => el.classList.remove('active'));
+            emptyState.style.display = 'none';
+
+            if (!loadedFrames[id]) {
+                const container = document.createElement('div');
+                container.className = 'iframe-container';
+                container.id = `frame-${id}`;
+                container.innerHTML = `
+                    <div class="loading">
+                        <div class="spinner"></div>
+                        <span>Загрузка...</span>
+                    </div>
+                    <iframe src="${tool.url}"></iframe>
+                `;
+                content.appendChild(container);
+                
+                const iframe = container.querySelector('iframe');
+                iframe.onload = () => container.classList.add('loaded');
+                
+                loadedFrames[id] = container;
+            }
+
+            loadedFrames[id].classList.add('active');
+            currentTool = id;
+
+            const url = new URL(window.location);
+            url.searchParams.set('page', id);
+            history.replaceState(null, '', url);
+        }
+
+        const params = new URLSearchParams(window.location.search);
+        const page = params.get('page');
+        if (page && tools.find(t => t.id === page)) {
+            selectTool(page);
+        }
+
+        const collapsed = params.get('collapsed');
+        if (collapsed === 'true') {
+            sidebar.classList.add('collapsed');
+            toggleBtn.textContent = '▶';
+        }
+    </script>
+</body>
+</html>

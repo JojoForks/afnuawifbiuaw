@@ -270,6 +270,42 @@
         .iframe-container.loaded .loading {
             display: none;
         }
+
+        .context-menu {
+            position: fixed;
+            background: #fff;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            padding: 4px;
+            z-index: 9999;
+            min-width: 220px;
+            display: none;
+        }
+
+        .context-menu.show {
+            display: block;
+        }
+
+        .context-menu-item {
+            padding: 10px 12px;
+            cursor: pointer;
+            border-radius: 6px;
+            font-size: 0.875rem;
+            color: #334155;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .context-menu-item:hover {
+            background: #f1f5f9;
+        }
+
+        .context-menu-item-icon {
+            font-size: 1rem;
+        }
+
     </style>
 </head>
 <body>
@@ -294,6 +330,18 @@
             <div class="empty-state-hint">Нажмите на пункт меню слева</div>
         </div>
     </main>
+
+    <div class="context-menu" id="contextMenu">
+        <div class="context-menu-item" id="copyToolsLink">
+            <span class="context-menu-item-icon">🔗</span>
+            <span>Скопировать ссылку</span>
+        </div>
+        <div class="context-menu-item" id="copyOriginalLink">
+            <span class="context-menu-item-icon">📄</span>
+            <span>Скопировать оригинальную ссылку</span>
+        </div>
+    </div>
+
 
     <script>
         const tools = [
@@ -432,6 +480,39 @@
             sidebar.classList.add('collapsed');
             toggleBtn.textContent = '▶';
         }
+
+        // Context menu
+        const contextMenu = document.getElementById('contextMenu');
+        let contextToolId = null;
+
+        document.querySelectorAll('.nav-item').forEach(item => {
+            item.addEventListener('contextmenu', (e) => {
+                e.preventDefault();
+                contextToolId = item.dataset.id;
+                contextMenu.style.left = e.clientX + 'px';
+                contextMenu.style.top = e.clientY + 'px';
+                contextMenu.classList.add('show');
+            });
+        });
+
+        document.addEventListener('click', () => {
+            contextMenu.classList.remove('show');
+        });
+
+        document.getElementById('copyToolsLink').onclick = () => {
+            if (!contextToolId) return;
+            const url = new URL(window.location.origin + window.location.pathname);
+            url.searchParams.set('page', contextToolId);
+            navigator.clipboard.writeText(url.toString());
+        };
+
+        document.getElementById('copyOriginalLink').onclick = () => {
+            if (!contextToolId) return;
+            const tool = tools.find(t => t.id === contextToolId);
+            if (!tool) return;
+            const url = new URL(tool.url, window.location.href);
+            navigator.clipboard.writeText(url.toString());
+        };
     </script>
 </body>
 </html>

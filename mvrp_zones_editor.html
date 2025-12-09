@@ -276,7 +276,12 @@
             <h1>Редактор Зон</h1>
         </div>
         <div class="controls">
-            <!-- URL Input -->            
+            <!-- URL Input -->
+            <div class="input-group">
+                <input type="text" id="url-input" class="url-input" placeholder="UUID или ссылка на планирование...">
+                <button onclick="loadFromUrl()" class="btn btn-load">Загрузить</button>
+            </div>
+            
             <div style="border-left: 1px solid #d1d5db; height: 24px; margin: 0 5px;"></div>
 
             <!-- File Input -->
@@ -428,14 +433,14 @@
             const input = document.getElementById('url-input').value.trim();
             if (!input) return alert('Введите ссылку или UUID');
 
-            const uuidMatch = input.match(/([a-f0-9]+-[a-f0-9]+-[a-f0-9]+-[a-f0-9]+)/i);
+            const uuidMatch = input.match(/([a-f0-9]{8}-[a-f0-9]{8}-[a-f0-9]{8}-[a-f0-9]{8})/i);
             
             if (!uuidMatch) {
-                return alert('Не удалось найти UUID в строке. Проверьте формат.');
+                return alert('Не удалось найти UUID в строке. Формат: xxxxxxxx-xxxxxxxx-xxxxxxxx-xxxxxxxx');
             }
             
             const uuid = uuidMatch[0];
-            const apiUrl = `https://courier.yandex.ru/vrs/api/v1/log/request/${uuid}`;
+            const apiUrl = `https://routeq.gens.codes/request/${uuid}`;
 
             setLoading(true);
             showStatus(`Запрос данных: ${uuid}...`);
@@ -447,10 +452,10 @@
                 }
                 const data = await response.json();
                 loadData(data);
-                showStatus('Данные успешно загружены из Yandex API');
+                showStatus('Данные успешно загружены');
             } catch (err) {
                 console.error(err);
-                alert(`Ошибка загрузки: ${err.message}.\n\nЕсли вы запускаете файл локально, браузер может блокировать запрос (CORS). Попробуйте запустить через локальный сервер или загрузите JSON вручную.`);
+                alert(`Ошибка загрузки: ${err.message}`);
             } finally {
                 setLoading(false);
             }

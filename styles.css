@@ -511,7 +511,8 @@ input[type="radio"] {
     transition: opacity 0.15s;
 }
 
-.list-item:hover .item-actions {
+.list-item:hover .item-actions,
+.zone-item:hover .item-actions {
     opacity: 1;
 }
 

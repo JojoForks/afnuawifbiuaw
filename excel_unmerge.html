@@ -4,27 +4,162 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Разъединение объединенных ячеек Excel</title>
+    <style>
+        :root {
+            --bg-color: #ffffff;
+            --text-color: #31333f;
+            --border-color: #e0e0e0;
+            --accent-color: #ff4b4b;
+            --hover-color: #e63946;
+            --success-color: #28a745;
+            --card-bg: #f0f2f6;
+        }
+
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --bg-color: #0e1117;
+                --text-color: #fafafa;
+                --border-color: #4f4f4f;
+                --card-bg: #262730;
+            }
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            line-height: 1.6;
+            padding: 20px;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            font-weight: 600;
+            margin-bottom: 2rem;
+            text-align: center;
+            padding-bottom: 1rem;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .card {
+            background: var(--card-bg);
+            border-radius: 0.5rem;
+            padding: 1.5rem;
+            margin-bottom: 1rem;
+            border: 1px solid var(--border-color);
+        }
+
+        .form-group {
+            margin-bottom: 1.5rem;
+        }
+
+        .form-group:last-child {
+            margin-bottom: 0;
+        }
+
+        label {
+            display: block;
+            font-weight: 500;
+            margin-bottom: 0.5rem;
+        }
+
+        input[type="file"] {
+            background-color: var(--bg-color);
+            border: 1px solid var(--border-color);
+            border-radius: 0.25rem;
+            color: var(--text-color);
+            padding: 0.5rem;
+            width: 100%;
+            font-family: inherit;
+        }
+
+        select {
+            background-color: var(--bg-color);
+            border: 1px solid var(--border-color);
+            border-radius: 0.25rem;
+            color: var(--text-color);
+            padding: 0.5rem;
+            width: 100%;
+            font-family: inherit;
+            font-size: 1rem;
+        }
+
+        select:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .btn-group {
+            display: flex;
+            gap: 10px;
+            margin-top: 1.5rem;
+        }
+
+        button {
+            background-color: var(--accent-color);
+            color: white;
+            border: none;
+            border-radius: 0.25rem;
+            padding: 0.5rem 1rem;
+            cursor: pointer;
+            font-weight: 500;
+            font-size: 1rem;
+            transition: background-color 0.2s;
+            font-family: inherit;
+        }
+
+        button:hover {
+            background-color: var(--hover-color);
+        }
+
+        button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .btn-success {
+            background-color: var(--success-color);
+        }
+
+        .btn-success:hover {
+            background-color: #218838;
+        }
+    </style>
 </head>
 <body>
+    <div class="container">
+        <h1>Разъединение объединенных ячеек Excel</h1>
 
-    <h1>Разъединение объединенных ячеек Excel</h1>
+        <div class="card">
+            <div class="form-group">
+                <label>Выберите Excel файл (.xlsx):</label>
+                <input type="file" id="excelFile" accept=".xlsx,.xls">
+            </div>
 
-    <p>
-        <label>Выберите Excel файл (.xlsx):</label><br>
-        <input type="file" id="excelFile" accept=".xlsx,.xls">
-    </p>
+            <div class="form-group">
+                <label>Выберите лист:</label>
+                <select id="sheetName" disabled>
+                    <option value="">Сначала загрузите файл</option>
+                </select>
+            </div>
 
-    <p>
-        <label>Выберите лист:</label><br>
-        <select id="sheetName" disabled>
-            <option value="">Сначала загрузите файл</option>
-        </select>
-    </p>
-
-    <p>
-        <button id="processBtn">Обработать файл</button>
-        <button id="downloadBtn" style="display:none">Скачать обработанный файл</button>
-    </p>
+            <div class="btn-group">
+                <button id="processBtn">Обработать файл</button>
+                <button id="downloadBtn" class="btn-success" style="display:none">Скачать обработанный файл</button>
+            </div>
+        </div>
+    </div>
 
     <!-- Подключаем XLSX-Populate для работы с Excel со стилями -->
     <script src="https://unpkg.com/xlsx-populate/browser/xlsx-populate.min.js"></script>

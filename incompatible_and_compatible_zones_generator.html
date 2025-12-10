@@ -292,9 +292,9 @@
 
 			// Приоритет: URL > файл
 			if (urlInput) {
-				const uuidMatch = urlInput.match(/([a-f0-9]{8}-[a-f0-9]{8}-[a-f0-9]{8}-[a-f0-9]{8})/i);
+				const uuidMatch = urlInput.match(/([a-f0-9]+-[a-f0-9]+-[a-f0-9]+-[a-f0-9]+)/i);
 				if (!uuidMatch) {
-					return alert('Не удалось найти UUID. Формат: xxxxxxxx-xxxxxxxx-xxxxxxxx-xxxxxxxx');
+					return alert('Не удалось найти UUID');
 				}
 
 				const uuid = uuidMatch[0];

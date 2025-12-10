@@ -1,72 +1,818 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-    <meta charset="UTF-8">
-    <title>Оптимизатор GeoJSON</title>
-    <!-- Подключаем библиотеку Turf.js для работы с географическими данными -->
-    <script src="https://cdn.jsdelivr.net/npm/@turf/turf@6.5.0/turf.min.js"></script>
+	<meta charset="UTF-8">
+	<title>Оптимизатор GeoJSON</title>
+	<script src="https://cdn.jsdelivr.net/npm/@turf/turf@6.5.0/turf.min.js"></script>
+	<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+	<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+	<style>
+		* {
+			box-sizing: border-box;
+		}
+
+		.zone-generator {
+			font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+			background-color: #ffffff !important;
+			color: #31333f !important;
+			padding: 1.5rem;
+			min-height: 100vh;
+			margin: 0;
+		}
+
+		.zone-generator h1 {
+			color: #31333f !important;
+			font-weight: 600 !important;
+			margin-bottom: 1.5rem !important;
+			font-size: 1.75rem;
+		}
+
+		.zone-generator label {
+			color: #31333f !important;
+			font-weight: 500 !important;
+			margin-bottom: 0.5rem !important;
+			display: inline-block !important;
+		}
+
+		.zone-generator input[type="file"],
+		.zone-generator input[type="number"],
+		.zone-generator input[type="text"] {
+			background-color: #f0f2f6 !important;
+			border: 1px solid #e0e0e0 !important;
+			border-radius: 0.25rem !important;
+			color: #31333f !important;
+			padding: 0.5rem !important;
+			margin-bottom: 1rem !important;
+			width: 100% !important;
+			max-width: 400px !important;
+			font-family: inherit !important;
+		}
+
+		.zone-generator input[type="range"] {
+			width: 100%;
+			max-width: 400px;
+			height: 6px;
+			border-radius: 3px;
+			background: #e0e0e0;
+			outline: none;
+			margin: 0.5rem 0;
+			-webkit-appearance: none;
+		}
+
+		.zone-generator input[type="range"]::-webkit-slider-thumb {
+			-webkit-appearance: none;
+			width: 18px;
+			height: 18px;
+			border-radius: 50%;
+			background: #ff4b4b;
+			cursor: pointer;
+			border: 2px solid #fff;
+			box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+		}
+
+		.zone-generator input[type="range"]::-moz-range-thumb {
+			width: 18px;
+			height: 18px;
+			border-radius: 50%;
+			background: #ff4b4b;
+			cursor: pointer;
+			border: 2px solid #fff;
+			box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+		}
+
+		.zone-generator button {
+			background-color: #ff4b4b !important;
+			color: white !important;
+			border: none !important;
+			border-radius: 0.25rem !important;
+			padding: 0.5rem 1rem !important;
+			cursor: pointer !important;
+			font-weight: 500 !important;
+			transition: background-color 0.2s !important;
+			font-family: inherit !important;
+			font-size: 0.95rem;
+		}
+
+		.zone-generator button:hover {
+			background-color: #e63946 !important;
+		}
+
+		.zone-generator button:disabled {
+			background-color: #ccc !important;
+			cursor: not-allowed !important;
+		}
+
+		.zone-generator .group {
+			border: 1px solid #e0e0e0 !important;
+			padding: 1rem !important;
+			border-radius: 0.5rem !important;
+			margin: 1rem 0 !important;
+			background-color: #f0f2f6 !important;
+		}
+
+		.zone-generator #map {
+			height: 500px !important;
+			border: 1px solid #e0e0e0 !important;
+			border-radius: 0.5rem !important;
+			margin: 1rem 0 !important;
+		}
+
+		.stats-panel {
+			display: flex;
+			gap: 2rem;
+			flex-wrap: wrap;
+			margin: 1rem 0;
+		}
+
+		.stat-card {
+			background-color: #f0f2f6;
+			border: 1px solid #e0e0e0;
+			color: #31333f;
+			padding: 1rem 1.5rem;
+			border-radius: 0.5rem;
+			min-width: 180px;
+		}
+
+		.stat-card .stat-label {
+			font-size: 0.8rem;
+			opacity: 0.9;
+			margin-bottom: 0.25rem;
+		}
+
+		.stat-card .stat-value {
+			font-size: 1.75rem;
+			font-weight: 700;
+		}
+
+		.tolerance-display {
+			font-size: 1.1rem;
+			font-weight: 600;
+			color: #ff4b4b;
+			margin-left: 0.75rem;
+		}
+
+		.legend {
+			display: flex;
+			gap: 1.5rem;
+			margin: 0.5rem 0;
+			flex-wrap: wrap;
+		}
+
+		.legend-item {
+			display: flex;
+			align-items: center;
+			gap: 0.5rem;
+			font-size: 0.9rem;
+		}
+
+		.legend-color {
+			width: 20px;
+			height: 4px;
+			border-radius: 2px;
+		}
+
+		.legend-color.original {
+			background: #3388ff;
+		}
+
+		.legend-color.optimized {
+			background: #ff4b4b;
+		}
+
+		.legend-dot {
+			width: 8px;
+			height: 8px;
+			border-radius: 50%;
+		}
+
+		.legend-dot.original {
+			background: #2563eb;
+			border: 1px solid #1d4ed8;
+		}
+
+		.legend-dot.optimized {
+			background: #ff4b4b;
+			border: 1px solid #dc2626;
+		}
+
+		.checkbox-group {
+			display: flex;
+			gap: 1.5rem;
+			flex-wrap: wrap;
+			align-items: center;
+		}
+
+		.checkbox-label {
+			display: flex;
+			align-items: center;
+			gap: 0.5rem;
+			cursor: pointer;
+			font-weight: 500;
+		}
+
+		.checkbox-label input[type="checkbox"] {
+			-webkit-appearance: none;
+			appearance: none;
+			width: 18px;
+			height: 18px;
+			border: 2px solid #e0e0e0;
+			border-radius: 4px;
+			background-color: #fff;
+			cursor: pointer;
+			position: relative;
+			margin: 0;
+		}
+
+		.checkbox-label input[type="checkbox"]:checked {
+			background-color: #ff4b4b;
+			border-color: #ff4b4b;
+		}
+
+		.checkbox-label input[type="checkbox"]:checked::after {
+			content: '';
+			position: absolute;
+			left: 5px;
+			top: 2px;
+			width: 4px;
+			height: 8px;
+			border: solid white;
+			border-width: 0 2px 2px 0;
+			transform: rotate(45deg);
+		}
+
+		.checkbox-label input[type="checkbox"]:hover {
+			border-color: #ff4b4b;
+		}
+
+		/* Тёмная тема */
+		@media (prefers-color-scheme: dark) {
+			.zone-generator {
+				background-color: #0e1117 !important;
+				color: #fafafa !important;
+			}
+
+			.zone-generator h1,
+			.zone-generator label {
+				color: #fafafa !important;
+			}
+
+			.zone-generator input[type="file"],
+			.zone-generator input[type="number"],
+			.zone-generator input[type="text"] {
+				background-color: #262730 !important;
+				border-color: #4f4f4f !important;
+				color: #fafafa !important;
+			}
+
+			.zone-generator input[type="range"] {
+				background: #4f4f4f;
+			}
+
+			.zone-generator .group {
+				border-color: #4f4f4f !important;
+				background-color: #262730 !important;
+			}
+
+			.zone-generator #map {
+				border-color: #4f4f4f !important;
+			}
+
+			.tolerance-display {
+				color: #ff6b6b;
+			}
+
+			.stat-card {
+				background-color: #262730;
+				border-color: #4f4f4f;
+				color: #fafafa;
+			}
+
+			.checkbox-label input[type="checkbox"] {
+				background-color: #262730;
+				border-color: #4f4f4f;
+			}
+		}
+	</style>
 </head>
-<body>
-    <h1>Оптимизатор GeoJSON</h1>
-    <!-- Элемент для выбора файла -->
-    <input type="file" id="geojsonFile" accept=".geojson">
-    <br><br>
-    <!-- Ползунок для регулировки tolerance -->
-    <label for="toleranceRange">Уровень оптимизации (tolerance):</label>
-    <input type="range" id="toleranceRange" min="0" max="0.05" step="0.0001" value="0.001">
-    <span id="toleranceValue">0.001</span>
-    <br><br>
-    <!-- Кнопка для запуска оптимизации -->
-    <button id="optimizeButton">Оптимизировать</button>
-    <br><br>
-    <!-- Ссылка для скачивания оптимизированного файла -->
-    <a id="downloadLink" href="#" style="display:none;">Скачать оптимизированный файл</a>
+<body class="zone-generator">
+	<h1>🗺️ Оптимизатор GeoJSON</h1>
 
-    <script>
-        // Обновляем отображение значения tolerance при перемещении ползунка
-        const toleranceRange = document.getElementById('toleranceRange');
-        const toleranceValue = document.getElementById('toleranceValue');
-        toleranceRange.addEventListener('input', function() {
-            toleranceValue.textContent = toleranceRange.value;
-        });
+	<div class="group">
+		<label>Загрузите по ссылке/UUID или выберите файл:</label><br>
+		<input type="text" id="urlInput" placeholder="UUID или ссылка на планирование" style="margin-bottom: 0.5rem;"><br>
+		<input type="file" id="geojsonFile" accept=".geojson,.json">
+		<div id="fileInfo" style="margin-top: 0.5rem; font-weight: 500;"></div>
+		<br>
+		<button id="loadButton">Загрузить</button>
+	</div>
 
-        // Обработчик события для кнопки "Оптимизировать"
-        document.getElementById('optimizeButton').addEventListener('click', function() {
-            const fileInput = document.getElementById('geojsonFile');
-            if (fileInput.files.length === 0) {
-                alert('Пожалуйста, выберите файл.');
-                return;
-            }
+	<div id="workPanel" style="display: none;">
+		<div class="stats-panel">
+			<div class="stat-card">
+				<div class="stat-label">Исходных точек</div>
+				<div class="stat-value" id="originalPoints">0</div>
+			</div>
+			<div class="stat-card">
+				<div class="stat-label">После оптимизации</div>
+				<div class="stat-value" id="optimizedPoints">0</div>
+			</div>
+			<div class="stat-card">
+				<div class="stat-label">Сокращение</div>
+				<div class="stat-value" id="reductionPercent">0%</div>
+			</div>
+		</div>
 
-            const file = fileInput.files[0];
-            const reader = new FileReader();
+		<div class="group">
+			<label for="toleranceRange">Уровень оптимизации (tolerance):</label>
+			<span class="tolerance-display" id="toleranceValue">0.0010</span>
+			<br>
+			<input type="range" id="toleranceRange" min="0" max="0.1" step="0.0001" value="0.001">
+			<br><br>
+			<div class="legend">
+				<div class="legend-item">
+					<div class="legend-color original"></div>
+					<span>Исходный контур</span>
+				</div>
+				<div class="legend-item">
+					<div class="legend-color optimized"></div>
+					<span>Оптимизированный</span>
+				</div>
+				<div class="legend-item">
+					<div class="legend-dot original"></div>
+					<span>Исходные точки</span>
+				</div>
+				<div class="legend-item">
+					<div class="legend-dot optimized"></div>
+					<span>Оптимизированные точки</span>
+				</div>
+			</div>
+			<br>
+			<div class="checkbox-group">
+				<label class="checkbox-label">
+					<input type="checkbox" id="toggleOriginal" checked>
+					<span>Показать исходный</span>
+				</label>
+				<label class="checkbox-label">
+					<input type="checkbox" id="toggleOptimized" checked>
+					<span>Показать оптимизированный</span>
+				</label>
+				<label class="checkbox-label">
+					<input type="checkbox" id="togglePoints" checked>
+					<span>Показать точки</span>
+				</label>
+				<label class="checkbox-label">
+					<input type="checkbox" id="toggleMulticolor">
+					<span>Разноцветные зоны</span>
+				</label>
+			</div>
+		</div>
 
-            reader.onload = function(e) {
-                try {
-                    const geojson = JSON.parse(e.target.result);
-                    // Получаем значение tolerance из ползунка
-                    const tolerance = parseFloat(document.getElementById('toleranceRange').value);
-                    // Настройки для функции simplify
-                    const options = { tolerance: tolerance, highQuality: true };
-                    // Оптимизация геометрии
-                    const simplified = turf.simplify(geojson, options);
+		<div id="map"></div>
 
-                    const simplifiedData = JSON.stringify(simplified);
-                    const blob = new Blob([simplifiedData], { type: 'application/json' });
-                    const url = URL.createObjectURL(blob);
+		<div class="group">
+			<button id="downloadGeoJSONButton">Скачать GeoJSON</button>
+			<button id="downloadPlanningButton" style="display: none; margin-left: 12px;">Скачать планирование</button>
+		</div>
+	</div>
 
-                    const downloadLink = document.getElementById('downloadLink');
-                    downloadLink.href = url;
-                    downloadLink.download = 'simplified.geojson';
-                    downloadLink.style.display = 'inline';
-                    downloadLink.textContent = 'Скачать оптимизированный файл';
-                } catch (err) {
-                    alert('Ошибка при обработке файла: ' + err.message);
-                }
-            };
+	<script>
+		let map = null;
+		let originalGeoJSON = null;
+		let optimizedGeoJSON = null;
+		let planningData = null;
+		let fileType = null; // 'geojson' или 'planning'
 
-            reader.readAsText(file);
-        });
-    </script>
+		let originalLayer = null;
+		let optimizedLayer = null;
+		let originalPointsLayer = null;
+		let optimizedPointsLayer = null;
+
+		let showOriginal = true;
+		let showOptimized = true;
+		let showPoints = true;
+		let multicolorMode = false;
+
+		// Определение типа файла
+		function determineFileType(data) {
+			if (data && typeof data === 'object') {
+				if (data.zones && Array.isArray(data.zones)) {
+					return 'planning';
+				}
+				if (data.features && Array.isArray(data.features)) {
+					return 'geojson';
+				}
+			}
+			return 'unknown';
+		}
+
+		// Конвертация планирования в GeoJSON
+		function planningToGeoJSON(planning) {
+			return {
+				type: 'FeatureCollection',
+				features: planning.zones.map(zone => ({
+					type: 'Feature',
+					geometry: zone.geometry,
+					properties: {
+						id: zone.id,
+						description: zone.id
+					}
+				}))
+			};
+		}
+
+		// Применение оптимизированных геометрий к планированию
+		function applyOptimizedToPlanning() {
+			if (!planningData || !optimizedGeoJSON) return null;
+
+			const updatedPlanning = JSON.parse(JSON.stringify(planningData));
+			
+			// Создаём маппинг id -> оптимизированная геометрия
+			const geometryMap = new Map();
+			if (optimizedGeoJSON.features) {
+				optimizedGeoJSON.features.forEach(feature => {
+					const id = feature.properties?.id || feature.properties?.description;
+					if (id) {
+						geometryMap.set(id, feature.geometry);
+					}
+				});
+			}
+
+			// Применяем оптимизированные геометрии
+			updatedPlanning.zones = updatedPlanning.zones.map(zone => {
+				const optimizedGeometry = geometryMap.get(zone.id);
+				if (optimizedGeometry) {
+					return { ...zone, geometry: optimizedGeometry };
+				}
+				return zone;
+			});
+
+			return updatedPlanning;
+		}
+
+		// Генерация цвета по индексу
+		function getColorByIndex(index, total) {
+			const hue = (index * 360 / total) % 360;
+			return `hsl(${hue}, 70%, 50%)`;
+		}
+
+		function getDarkerColor(index, total) {
+			const hue = (index * 360 / total) % 360;
+			return `hsl(${hue}, 70%, 35%)`;
+		}
+
+		const toleranceRange = document.getElementById('toleranceRange');
+		const toleranceValue = document.getElementById('toleranceValue');
+
+		// Подсчёт точек в GeoJSON
+		function countPoints(geojson) {
+			let count = 0;
+			const coords = turf.coordAll(geojson);
+			return coords.length;
+		}
+
+		// Получить все координаты как массив точек
+		function getAllCoordinates(geojson) {
+			return turf.coordAll(geojson);
+		}
+
+		// Обновление статистики
+		function updateStats() {
+			if (!originalGeoJSON || !optimizedGeoJSON) return;
+
+			const originalCount = countPoints(originalGeoJSON);
+			const optimizedCount = countPoints(optimizedGeoJSON);
+			const reduction = originalCount > 0 
+				? Math.round((1 - optimizedCount / originalCount) * 100) 
+				: 0;
+
+			document.getElementById('originalPoints').textContent = originalCount.toLocaleString();
+			document.getElementById('optimizedPoints').textContent = optimizedCount.toLocaleString();
+			document.getElementById('reductionPercent').textContent = reduction + '%';
+		}
+
+		// Создание слоя с точками
+		function createPointsLayer(coords, color, radius) {
+			const markers = [];
+			coords.forEach(coord => {
+				const marker = L.circleMarker([coord[1], coord[0]], {
+					radius: radius,
+					fillColor: color,
+					color: color === '#2563eb' ? '#1d4ed8' : '#dc2626',
+					weight: 1,
+					opacity: 0.8,
+					fillOpacity: 0.6
+				});
+				markers.push(marker);
+			});
+			return L.layerGroup(markers);
+		}
+
+		// Обновление карты
+		function updateMap() {
+			if (!map || !originalGeoJSON) return;
+
+			// Удаляем старые слои
+			if (originalLayer) map.removeLayer(originalLayer);
+			if (optimizedLayer) map.removeLayer(optimizedLayer);
+			if (originalPointsLayer) map.removeLayer(originalPointsLayer);
+			if (optimizedPointsLayer) map.removeLayer(optimizedPointsLayer);
+
+			// Подсчёт количества фич для цветов
+			let featureCount = 1;
+			if (originalGeoJSON.features) {
+				featureCount = originalGeoJSON.features.length;
+			}
+
+			// Исходный слой
+			if (showOriginal) {
+				let featureIndex = 0;
+				originalLayer = L.geoJSON(originalGeoJSON, {
+					style: function(feature) {
+						if (multicolorMode) {
+							const color = getColorByIndex(featureIndex++, featureCount);
+							return {
+								color: color,
+								weight: 3,
+								fillColor: color,
+								fillOpacity: 0.2,
+								opacity: 0.8
+							};
+						}
+						return {
+							color: '#3388ff',
+							weight: 3,
+							fillOpacity: 0.1,
+							opacity: 0.7
+						};
+					},
+					onEachFeature: function(feature, layer) {
+						// Показываем название зоны при наведении
+						let name = feature.properties?.name || feature.properties?.description || feature.properties?.id || '';
+						if (name) {
+							layer.bindTooltip(name, { sticky: true });
+						}
+					}
+				}).addTo(map);
+			}
+
+			// Оптимизированный слой
+			if (showOptimized && optimizedGeoJSON) {
+				let featureIndex = 0;
+				optimizedLayer = L.geoJSON(optimizedGeoJSON, {
+					style: function(feature) {
+						if (multicolorMode) {
+							const color = getColorByIndex(featureIndex++, featureCount);
+							return {
+								color: getDarkerColor(featureIndex - 1, featureCount),
+								weight: 2,
+								fillColor: color,
+								fillOpacity: 0.25,
+								opacity: 0.9
+							};
+						}
+						return {
+							color: '#ff4b4b',
+							weight: 2,
+							fillOpacity: 0.15,
+							opacity: 0.9
+						};
+					},
+					onEachFeature: function(feature, layer) {
+						let name = feature.properties?.name || feature.properties?.description || feature.properties?.id || '';
+						if (name) {
+							layer.bindTooltip(name, { sticky: true });
+						}
+					}
+				}).addTo(map);
+			}
+
+			// Точки
+			if (showPoints && !multicolorMode) {
+				if (showOriginal) {
+					const originalCoords = getAllCoordinates(originalGeoJSON);
+					originalPointsLayer = createPointsLayer(originalCoords, '#2563eb', 4);
+					originalPointsLayer.addTo(map);
+				}
+
+				if (showOptimized && optimizedGeoJSON) {
+					const optimizedCoords = getAllCoordinates(optimizedGeoJSON);
+					optimizedPointsLayer = createPointsLayer(optimizedCoords, '#ff4b4b', 5);
+					optimizedPointsLayer.addTo(map);
+				}
+			}
+		}
+
+		// Оптимизация с текущим tolerance
+		function optimize() {
+			if (!originalGeoJSON) return;
+
+			const tolerance = parseFloat(toleranceRange.value);
+			toleranceValue.textContent = tolerance.toFixed(4);
+
+			try {
+				optimizedGeoJSON = turf.simplify(originalGeoJSON, {
+					tolerance: tolerance,
+					highQuality: true
+				});
+			} catch (err) {
+				console.error('Ошибка оптимизации:', err);
+				optimizedGeoJSON = originalGeoJSON;
+			}
+
+			updateStats();
+			updateMap();
+		}
+
+		// Инициализация карты
+		function initMap() {
+			if (map) return;
+
+			map = L.map('map').setView([55.7558, 37.6173], 10);
+			L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+				maxZoom: 19,
+				attribution: '&copy; OpenStreetMap contributors'
+			}).addTo(map);
+		}
+
+		// Обработка загруженных данных
+		function processLoadedData(data) {
+			fileType = determineFileType(data);
+			
+			const fileInfo = document.getElementById('fileInfo');
+			const planningBtn = document.getElementById('downloadPlanningButton');
+
+			if (fileType === 'planning') {
+				planningData = data;
+				originalGeoJSON = planningToGeoJSON(data);
+				const zoneCount = data.zones.length;
+				fileInfo.textContent = `Файл планирования: ${zoneCount} зон`;
+				fileInfo.style.color = '#28a745';
+				planningBtn.style.display = 'inline-block';
+			} else if (fileType === 'geojson') {
+				planningData = null;
+				originalGeoJSON = data;
+				const featureCount = data.features ? data.features.length : 0;
+				fileInfo.textContent = `GeoJSON: ${featureCount} объектов`;
+				fileInfo.style.color = '#007bff';
+				planningBtn.style.display = 'none';
+			} else {
+				fileInfo.textContent = 'Неподдерживаемый формат файла';
+				fileInfo.style.color = '#dc3545';
+				return false;
+			}
+
+			document.getElementById('workPanel').style.display = 'block';
+			
+			initMap();
+			
+			setTimeout(() => {
+				map.invalidateSize();
+				optimize();
+
+				// Подгоняем карту под границы
+				if (originalLayer) {
+					try {
+						map.fitBounds(originalLayer.getBounds().pad(0.1));
+					} catch (err) {}
+				} else if (optimizedLayer) {
+					try {
+						map.fitBounds(optimizedLayer.getBounds().pad(0.1));
+					} catch (err) {}
+				}
+			}, 100);
+
+			return true;
+		}
+
+		// Превью выбранного файла
+		document.getElementById('geojsonFile').addEventListener('change', function(e) {
+			const file = e.target.files[0];
+			const fileInfo = document.getElementById('fileInfo');
+			
+			if (file) {
+				fileInfo.textContent = `Выбран файл: ${file.name}`;
+				fileInfo.style.color = '#666';
+			} else {
+				fileInfo.textContent = '';
+			}
+		});
+
+		// Кнопка загрузки
+		document.getElementById('loadButton').addEventListener('click', async function() {
+			const urlInput = document.getElementById('urlInput').value.trim();
+			const fileInput = document.getElementById('geojsonFile');
+			const fileInfo = document.getElementById('fileInfo');
+
+			// Приоритет: URL > файл
+			if (urlInput) {
+				const uuidMatch = urlInput.match(/([a-f0-9]+-[a-f0-9]+-[a-f0-9]+-[a-f0-9]+)/i);
+				if (!uuidMatch) {
+					alert('Не удалось найти UUID');
+					return;
+				}
+
+				const uuid = uuidMatch[0];
+				const apiUrl = `https://routeq.gens.codes/request/${uuid}`;
+
+				fileInfo.textContent = 'Загрузка...';
+				fileInfo.style.color = '#666';
+
+				try {
+					const response = await fetch(apiUrl);
+					if (!response.ok) throw new Error(`Ошибка: ${response.status}`);
+					const data = await response.json();
+					
+					if (!processLoadedData(data)) {
+						throw new Error('Неподдерживаемый формат данных');
+					}
+				} catch (err) {
+					console.error(err);
+					fileInfo.textContent = `Ошибка загрузки: ${err.message}`;
+					fileInfo.style.color = '#dc3545';
+				}
+				return;
+			}
+
+			// Загрузка из файла
+			if (!fileInput.files.length) {
+				alert('Введите ссылку/UUID или выберите файл.');
+				return;
+			}
+
+			const file = fileInput.files[0];
+			const reader = new FileReader();
+			reader.onload = function(e) {
+				try {
+					const data = JSON.parse(e.target.result);
+					processLoadedData(data);
+				} catch (err) {
+					alert('Ошибка при чтении файла: ' + err.message);
+				}
+			};
+			reader.readAsText(file);
+		});
+
+		// Изменение tolerance - пересчёт в реальном времени
+		toleranceRange.addEventListener('input', function() {
+			optimize();
+		});
+
+		// Чекбоксы переключения видимости
+		document.getElementById('toggleOriginal').addEventListener('change', function() {
+			showOriginal = this.checked;
+			updateMap();
+		});
+
+		document.getElementById('toggleOptimized').addEventListener('change', function() {
+			showOptimized = this.checked;
+			updateMap();
+		});
+
+		document.getElementById('togglePoints').addEventListener('change', function() {
+			showPoints = this.checked;
+			updateMap();
+		});
+
+		document.getElementById('toggleMulticolor').addEventListener('change', function() {
+			multicolorMode = this.checked;
+			updateMap();
+		});
+
+		// Скачивание файла
+		function downloadFile(data, filename) {
+			const dataStr = JSON.stringify(data, null, 2);
+			const blob = new Blob([dataStr], { type: 'application/json' });
+			const url = URL.createObjectURL(blob);
+
+			const a = document.createElement('a');
+			a.href = url;
+			a.download = filename;
+			document.body.appendChild(a);
+			a.click();
+			document.body.removeChild(a);
+			URL.revokeObjectURL(url);
+		}
+
+		// Скачивание GeoJSON
+		document.getElementById('downloadGeoJSONButton').addEventListener('click', function() {
+			if (!optimizedGeoJSON) {
+				alert('Сначала загрузите файл.');
+				return;
+			}
+			downloadFile(optimizedGeoJSON, 'optimized.geojson');
+		});
+
+		// Скачивание планирования
+		document.getElementById('downloadPlanningButton').addEventListener('click', function() {
+			if (!planningData || !optimizedGeoJSON) {
+				alert('Нет данных планирования.');
+				return;
+			}
+			const updatedPlanning = applyOptimizedToPlanning();
+			if (updatedPlanning) {
+				downloadFile(updatedPlanning, 'optimized_planning.json');
+			}
+		});
+	</script>
 </body>
 </html>

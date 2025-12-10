@@ -143,6 +143,10 @@
             z-index: 1;
         }
 
+        .leaflet-bottom.leaflet-right {
+            display: none !important;
+        }
+
         #status {
             position: absolute;
             bottom: 20px;
@@ -258,9 +262,8 @@
 // --- Init Map ---
 const map = L.map('map').setView([55.76, 37.64], 10);
 
-L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
-    attribution: '&copy; OpenStreetMap &copy; CARTO',
-    subdomains: 'abcd',
+L.tileLayer('https://tiles.api-maps.yandex.ru/v1/tiles/?apikey=567685cf-50f2-407c-9545-c91fd8b9c384&lang=ru_RU&x={x}&y={y}&z={z}&l=map&projection=web_mercator', {
+    attribution: '&copy; Яндекс Карты',
     maxZoom: 20
 }).addTo(map);
 

@@ -146,6 +146,46 @@
                 background: rgba(14, 17, 23, 0.9);
             }
         }
+
+        /* Скрываем панели Leaflet */
+        .leaflet-top.leaflet-left,
+        .leaflet-bottom.leaflet-right {
+            display: none !important;
+        }
+
+        /* Кнопка завершения редактирования */
+        #finish-edit-btn {
+            position: absolute;
+            top: 15px;
+            left: 15px;
+            z-index: 1000;
+            display: none;
+            padding: 10px 20px;
+            background: var(--accent-color, #ef4444);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 0.95rem;
+            font-weight: 600;
+            cursor: pointer;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            transition: transform 0.15s, background 0.15s;
+        }
+
+        #finish-edit-btn:hover {
+            background: #dc2626;
+            transform: scale(1.05);
+        }
+
+        #finish-edit-btn.visible {
+            display: block;
+            animation: fadeInBtn 0.2s ease;
+        }
+
+        @keyframes fadeInBtn {
+            from { opacity: 0; transform: translateY(-10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
     </style>
 </head>
 <body>
@@ -184,6 +224,7 @@
         
         <div id="map-container">
             <div id="map"></div>
+            <button id="finish-edit-btn" onclick="finishEditing()">✓ Завершить редактирование</button>
             <div id="status">Статус</div>
         </div>
     </div>
@@ -202,9 +243,8 @@
         // --- Initialization ---
         const map = L.map('map').setView([59.9343, 30.3351], 10);
 
-        L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
-            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
-            subdomains: 'abcd',
+        L.tileLayer('https://tiles.api-maps.yandex.ru/v1/tiles/?apikey=567685cf-50f2-407c-9545-c91fd8b9c384&lang=ru_RU&x={x}&y={y}&z={z}&l=map&projection=web_mercator', {
+            attribution: '&copy; Яндекс Карты',
             maxZoom: 20
         }).addTo(map);
 
@@ -482,6 +522,8 @@
             layerToListMap.set(stamp, li);
         }
 
+        let currentEditingLayer = null;
+
         function selectZone(layer, liElement) {
             document.querySelectorAll('.zone-item').forEach(el => el.classList.remove('active'));
             if (liElement) liElement.classList.add('active');
@@ -491,9 +533,32 @@
 
             if (map.hasLayer(layer)) {
                 map.flyToBounds(layer.getBounds(), { padding: [50, 50], duration: 0.5 });
-                if (layer.pm) layer.pm.enable({ allowSelfIntersection: false });
+                if (layer.pm) {
+                    layer.pm.enable({ allowSelfIntersection: false });
+                    currentEditingLayer = layer;
+                    showFinishButton(true);
+                }
             } else {
                 showStatus('Зона скрыта. Включите видимость для редактирования.');
+            }
+        }
+
+        function finishEditing() {
+            map.pm.disableDraw();
+            map.eachLayer(l => { if (l.pm) l.pm.disable(); });
+            map.pm.disableGlobalEditMode();
+            currentEditingLayer = null;
+            showFinishButton(false);
+            document.querySelectorAll('.zone-item').forEach(el => el.classList.remove('active'));
+            showStatus('Редактирование завершено');
+        }
+
+        function showFinishButton(show) {
+            const btn = document.getElementById('finish-edit-btn');
+            if (show) {
+                btn.classList.add('visible');
+            } else {
+                btn.classList.remove('visible');
             }
         }
 
@@ -501,36 +566,63 @@
             if (map.pm.globalDrawModeEnabled()) return;
             map.eachLayer(l => { if (l.pm) l.pm.disable(); });
             map.pm.enableDraw('Polygon', { snappable: true, snapDistance: 20 });
+            showFinishButton(true);
             showStatus('Нарисуйте новую зону на карте...');
         }
 
         function renameZone(layer, liElement) {
             const stamp = L.stamp(layer);
             const dataObj = layersMap.get(stamp);
+            const nameSpan = liElement.querySelector('.zone-name');
             
-            const oldName = getZoneName(dataObj) || '';
-            const newName = prompt("Введите новое имя/ID зоны:", oldName);
+            // Проверяем, не редактируется ли уже
+            if (nameSpan.querySelector('input')) return;
             
-            if (newName !== null && newName.trim() !== "") {
-                if (inputType === 'custom') {
-                     if (dataObj.id) dataObj.id = newName;
-                     else dataObj.name = newName;
-                     if (!dataObj.id && !dataObj.name) dataObj.id = newName;
-                } else {
-                    if (!dataObj.properties) dataObj.properties = {};
-                    dataObj.properties.name = newName;
-                    dataObj.properties.id = newName;
+            const oldName = getZoneName(dataObj) || nameSpan.textContent;
+            
+            // Создаём input для редактирования
+            const input = document.createElement('input');
+            input.type = 'text';
+            input.value = oldName;
+            input.style.cssText = 'width: 100%; padding: 2px 6px; border: 1px solid var(--accent-color); border-radius: 4px; font-size: 0.9rem; background: var(--bg-secondary); color: var(--text-primary);';
+            
+            nameSpan.textContent = '';
+            nameSpan.appendChild(input);
+            input.focus();
+            input.select();
+            
+            function saveNewName() {
+                const newName = input.value.trim();
+                if (newName && newName !== oldName) {
+                    if (inputType === 'custom') {
+                        if (dataObj.id) dataObj.id = newName;
+                        else dataObj.name = newName;
+                        if (!dataObj.id && !dataObj.name) dataObj.id = newName;
+                    } else {
+                        if (!dataObj.properties) dataObj.properties = {};
+                        dataObj.properties.name = newName;
+                        dataObj.properties.id = newName;
+                    }
+                    
+                    layer.unbindTooltip();
+                    layer.bindTooltip(newName);
+                    showStatus('Зона переименована');
                 }
-
-                const nameSpan = liElement.querySelector('.zone-name');
-                nameSpan.textContent = newName;
-                nameSpan.title = newName;
                 
-                layer.unbindTooltip();
-                layer.bindTooltip(newName);
-                
-                showStatus('Зона переименована');
+                nameSpan.textContent = newName || oldName;
+                nameSpan.title = newName || oldName;
             }
+            
+            input.addEventListener('blur', saveNewName);
+            input.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    input.blur();
+                } else if (e.key === 'Escape') {
+                    nameSpan.textContent = oldName;
+                    nameSpan.title = oldName;
+                }
+            });
         }
 
         // --- Saving ---

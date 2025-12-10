@@ -39,6 +39,10 @@
 			height: 500px;
 			border: 1px solid var(--border-color);
 			border-radius: var(--radius-lg);
+		}
+
+		.leaflet-bottom.leaflet-right {
+			display: none !important;
 			margin: 1rem 0;
 		}
 
@@ -436,9 +440,9 @@
 			if (map) return;
 
 			map = L.map('map').setView([55.7558, 37.6173], 10);
-			L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-				maxZoom: 19,
-				attribution: '&copy; OpenStreetMap contributors'
+			L.tileLayer('https://tiles.api-maps.yandex.ru/v1/tiles/?apikey=567685cf-50f2-407c-9545-c91fd8b9c384&lang=ru_RU&x={x}&y={y}&z={z}&l=map&projection=web_mercator', {
+				maxZoom: 20,
+				attribution: '&copy; Яндекс Карты'
 			}).addTo(map);
 		}
 

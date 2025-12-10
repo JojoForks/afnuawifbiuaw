@@ -7,7 +7,7 @@ app = FastAPI(docs_url=None, redoc_url=None)
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
 BASE_URL = "https://courier.yandex.ru/vrs/api/v1/log"
-UUID_PATTERN = re.compile(r'^[a-f0-9]{8}-[a-f0-9]{8}-[a-f0-9]{8}-[a-f0-9]{8}$')
+UUID_PATTERN = re.compile(r'^[a-f0-9]+-[a-f0-9]+-[a-f0-9]+-[a-f0-9]+$')
 
 def validate_uuid(uuid: str) -> str:
     if not UUID_PATTERN.match(uuid):

@@ -541,6 +541,10 @@ input[type="radio"] {
     height: 100%;
 }
 
+.leaflet-tile-pane {
+    filter: grayscale(100%) contrast(90%) brightness(110%);
+}
+
 /* === Group/Panel === */
 .group {
     border: 1px solid var(--border-color);

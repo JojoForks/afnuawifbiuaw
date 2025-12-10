@@ -4,156 +4,18 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>initial_routes generator</title>
+    <link rel="stylesheet" href="styles.css">
     <link href="https://cdn.jsdelivr.net/npm/jsoneditor@9/dist/jsoneditor.min.css" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/jsoneditor@9/dist/jsoneditor.min.js"></script>
     <style>
-        :root {
-            --bg-color: #ffffff;
-            --text-color: #31333f;
-            --border-color: #e0e0e0;
-            --accent-color: #ff4b4b;
-            --hover-color: #e63946;
-            --success-color: #28a745;
-            --error-color: #dc3545;
-            --card-bg: #f0f2f6;
-        }
-
-        @media (prefers-color-scheme: dark) {
-            :root {
-                --bg-color: #0e1117;
-                --text-color: #fafafa;
-                --border-color: #4f4f4f;
-                --card-bg: #262730;
-            }
-        }
-
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
+        /* Специфичные стили для initial_routes_gen */
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background-color: var(--bg-color);
-            color: var(--text-color);
-            line-height: 1.6;
-            margin: 0;
-            padding: 0;
             display: flex;
             flex-direction: column;
-            min-height: 100vh;
-        }
-
-        header {
-            background-color: var(--card-bg);
-            padding: 0.75rem 1.5rem;
-            border-bottom: 1px solid var(--border-color);
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            flex-wrap: wrap;
-            gap: 10px;
-        }
-
-        header h1 {
-            margin: 0;
-            font-size: 1.1rem;
-            font-weight: 700;
-            white-space: nowrap;
-        }
-
-        .controls {
-            display: flex;
-            gap: 0.75rem;
-            align-items: center;
-            flex-wrap: wrap;
-        }
-
-        .input-group {
-            display: flex;
-            align-items: center;
-        }
-
-        .url-input {
-            padding: 0.5rem;
-            border: 1px solid var(--border-color);
-            border-radius: 0.25rem 0 0 0.25rem;
-            width: 280px;
-            font-size: 0.9rem;
-            outline: none;
-            background: var(--bg-color);
-            color: var(--text-color);
-        }
-
-        .url-input:focus {
-            border-color: var(--accent-color);
-        }
-
-        .btn-load {
-            border-radius: 0 0.25rem 0.25rem 0;
-            background-color: #4b5563;
-            color: white;
-            border: none;
-            padding: 0.5rem 1rem;
-            cursor: pointer;
-            font-weight: 500;
-            transition: background-color 0.2s;
-        }
-
-        .btn-load:hover {
-            background-color: #374151;
-        }
-
-        .file-label {
-            display: inline-block;
-            padding: 0.5rem 1rem;
-            background-color: var(--bg-color);
-            border: 1px solid var(--border-color);
-            border-radius: 0.25rem;
-            cursor: pointer;
-            font-weight: 500;
-            font-size: 0.9rem;
-        }
-
-        .file-label:hover {
-            background-color: var(--card-bg);
-        }
-
-        .divider {
-            border-left: 1px solid var(--border-color);
-            height: 24px;
-            margin: 0 5px;
         }
 
         .container {
-            max-width: 1200px;
-            margin: 0 auto;
-            padding: 20px;
             flex: 1;
-        }
-
-        .file-input {
-            display: none;
-        }
-
-        .status {
-            padding: 10px;
-            border-radius: 0.25rem;
-            margin-top: 10px;
-            display: none;
-        }
-
-        .status.success {
-            background-color: rgba(40, 167, 69, 0.1);
-            color: var(--success-color);
-            border: 1px solid var(--success-color);
-        }
-
-        .status.error {
-            background-color: rgba(220, 53, 69, 0.1);
-            color: var(--error-color);
-            border: 1px solid var(--error-color);
         }
 
         .result-section {
@@ -162,55 +24,6 @@
 
         .settings-section {
             margin-bottom: 20px;
-        }
-
-        .settings-grid {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 15px;
-        }
-
-        @media (max-width: 900px) {
-            .settings-grid {
-                grid-template-columns: 1fr;
-            }
-        }
-
-        .setting-group {
-            background: var(--card-bg);
-            padding: 15px;
-            border-radius: 0.5rem;
-            border: 1px solid var(--border-color);
-        }
-
-        .setting-group h4 {
-            margin: 0 0 10px 0;
-            color: var(--accent-color);
-            font-size: 14px;
-            font-weight: 600;
-        }
-
-        .setting-item {
-            display: flex;
-            align-items: flex-start;
-            gap: 8px;
-            margin-bottom: 8px;
-        }
-
-        .setting-item:last-child {
-            margin-bottom: 0;
-        }
-
-        .setting-checkbox {
-            margin-top: 2px;
-            accent-color: var(--accent-color);
-        }
-
-        .setting-label {
-            font-size: 13px;
-            line-height: 1.4;
-            cursor: pointer;
-            flex: 1;
         }
 
         .sub-settings {
@@ -230,11 +43,6 @@
             gap: 5px;
         }
 
-        .radio-option input {
-            margin: 0;
-            accent-color: var(--accent-color);
-        }
-
         .radio-option label {
             font-size: 12px;
             cursor: pointer;
@@ -246,35 +54,9 @@
             margin-bottom: 20px;
         }
 
-        .btn {
-            background-color: var(--accent-color);
-            color: white;
-            border: none;
-            padding: 0.5rem 1rem;
-            border-radius: 0.25rem;
-            cursor: pointer;
-            font-size: 14px;
-            font-weight: 500;
-            transition: background-color 0.2s;
-        }
-
-        .btn:hover {
-            background-color: var(--hover-color);
-        }
-
-        .btn.secondary {
-            background-color: var(--card-bg);
-            color: var(--text-color);
-            border: 1px solid var(--border-color);
-        }
-
-        .btn.secondary:hover {
-            background-color: var(--border-color);
-        }
-
         .result-json {
             border: 1px solid var(--border-color);
-            border-radius: 0.25rem;
+            border-radius: var(--radius-sm);
             height: 600px;
             position: relative;
         }
@@ -284,84 +66,23 @@
             width: 100%;
         }
 
-        .stats {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 15px;
-            margin-bottom: 20px;
-        }
-
-        .stat-card {
-            background: var(--card-bg);
-            padding: 15px;
-            border-radius: 0.5rem;
-            text-align: center;
-            border: 1px solid var(--border-color);
-        }
-
-        .stat-number {
-            font-size: 24px;
-            font-weight: bold;
-            color: var(--accent-color);
-            margin-bottom: 5px;
-        }
-
-        .stat-label {
-            font-size: 14px;
-            color: var(--text-color);
-            opacity: 0.8;
-        }
-
-        .loading {
-            display: inline-block;
-            width: 20px;
-            height: 20px;
-            border: 3px solid rgba(255,255,255,.3);
-            border-radius: 50%;
-            border-top-color: #fff;
-            animation: spin 1s ease-in-out infinite;
-        }
-
-        @keyframes spin {
-            to { transform: rotate(360deg); }
-        }
-
         @media (max-width: 768px) {
-            header {
-                flex-direction: column;
-                gap: 10px;
-            }
-
-            .controls {
-                width: 100%;
-                justify-content: center;
-            }
-
-            .url-input {
-                width: 200px;
-            }
-
             .result-controls {
                 flex-direction: column;
-            }
-
-            .stats {
-                grid-template-columns: 1fr;
             }
         }
     </style>
 </head>
 <body>
-    <header>
+    <header class="app-header">
         <h1>initial_routes generator</h1>
         <div class="controls">
             <div class="input-group">
                 <input type="text" id="urlInput" class="url-input" placeholder="UUID или ссылка на результат">
-                <button id="loadUrlBtn" class="btn-load">Загрузить</button>
+                <button id="loadUrlBtn" class="btn btn-load">Загрузить</button>
             </div>
             <div class="divider"></div>
-            <label for="fileInput" class="file-label">📂 Файл</label>
-            <input type="file" id="fileInput" class="file-input" accept=".json">
+            <input type="file" id="fileInput" accept=".json">
         </div>
     </header>
 
@@ -454,20 +175,11 @@
             <div class="stats" id="stats"></div>
 
             <div class="result-controls">
-                <button class="btn" id="downloadBtn">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 5px;">
-                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                        <polyline points="7,10 12,15 17,10"></polyline>
-                        <line x1="12" y1="15" x2="12" y2="3"></line>
-                    </svg>
-                    Скачать JSON
+                <button class="btn btn-primary" id="downloadBtn">
+                    💾 Скачать JSON
                 </button>
-                <button class="btn secondary" id="copyBtn">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 5px;">
-                        <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
-                        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
-                    </svg>
-                    Копировать
+                <button class="btn btn-secondary" id="copyBtn">
+                    📋 Копировать
                 </button>
             </div>
 

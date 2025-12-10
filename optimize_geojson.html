@@ -3,118 +3,43 @@
 <head>
 	<meta charset="UTF-8">
 	<title>Оптимизатор GeoJSON</title>
+	<link rel="stylesheet" href="styles.css">
 	<script src="https://cdn.jsdelivr.net/npm/@turf/turf@6.5.0/turf.min.js"></script>
 	<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
 	<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
 	<style>
-		* {
-			box-sizing: border-box;
-		}
-
-		.zone-generator {
-			font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
-			background-color: #ffffff !important;
-			color: #31333f !important;
+		/* Специфичные стили для optimize_geojson */
+		body {
 			padding: 1.5rem;
-			min-height: 100vh;
-			margin: 0;
 		}
 
-		.zone-generator h1 {
-			color: #31333f !important;
-			font-weight: 600 !important;
-			margin-bottom: 1.5rem !important;
+		h1 {
+			margin-bottom: 1.5rem;
 			font-size: 1.75rem;
 		}
 
-		.zone-generator label {
-			color: #31333f !important;
-			font-weight: 500 !important;
-			margin-bottom: 0.5rem !important;
-			display: inline-block !important;
+		label {
+			display: inline-block;
+			margin-bottom: 0.5rem;
 		}
 
-		.zone-generator input[type="file"],
-		.zone-generator input[type="number"],
-		.zone-generator input[type="text"] {
-			background-color: #f0f2f6 !important;
-			border: 1px solid #e0e0e0 !important;
-			border-radius: 0.25rem !important;
-			color: #31333f !important;
-			padding: 0.5rem !important;
-			margin-bottom: 1rem !important;
-			width: 100% !important;
-			max-width: 400px !important;
-			font-family: inherit !important;
-		}
-
-		.zone-generator input[type="range"] {
+		input[type="file"],
+		input[type="text"] {
 			width: 100%;
 			max-width: 400px;
-			height: 6px;
-			border-radius: 3px;
-			background: #e0e0e0;
-			outline: none;
+			margin-bottom: 1rem;
+		}
+
+		input[type="range"] {
+			max-width: 400px;
 			margin: 0.5rem 0;
-			-webkit-appearance: none;
 		}
 
-		.zone-generator input[type="range"]::-webkit-slider-thumb {
-			-webkit-appearance: none;
-			width: 18px;
-			height: 18px;
-			border-radius: 50%;
-			background: #ff4b4b;
-			cursor: pointer;
-			border: 2px solid #fff;
-			box-shadow: 0 2px 4px rgba(0,0,0,0.2);
-		}
-
-		.zone-generator input[type="range"]::-moz-range-thumb {
-			width: 18px;
-			height: 18px;
-			border-radius: 50%;
-			background: #ff4b4b;
-			cursor: pointer;
-			border: 2px solid #fff;
-			box-shadow: 0 2px 4px rgba(0,0,0,0.2);
-		}
-
-		.zone-generator button {
-			background-color: #ff4b4b !important;
-			color: white !important;
-			border: none !important;
-			border-radius: 0.25rem !important;
-			padding: 0.5rem 1rem !important;
-			cursor: pointer !important;
-			font-weight: 500 !important;
-			transition: background-color 0.2s !important;
-			font-family: inherit !important;
-			font-size: 0.95rem;
-		}
-
-		.zone-generator button:hover {
-			background-color: #e63946 !important;
-		}
-
-		.zone-generator button:disabled {
-			background-color: #ccc !important;
-			cursor: not-allowed !important;
-		}
-
-		.zone-generator .group {
-			border: 1px solid #e0e0e0 !important;
-			padding: 1rem !important;
-			border-radius: 0.5rem !important;
-			margin: 1rem 0 !important;
-			background-color: #f0f2f6 !important;
-		}
-
-		.zone-generator #map {
-			height: 500px !important;
-			border: 1px solid #e0e0e0 !important;
-			border-radius: 0.5rem !important;
-			margin: 1rem 0 !important;
+		#map {
+			height: 500px;
+			border: 1px solid var(--border-color);
+			border-radius: var(--radius-lg);
+			margin: 1rem 0;
 		}
 
 		.stats-panel {
@@ -125,82 +50,14 @@
 		}
 
 		.stat-card {
-			background-color: #f0f2f6;
-			border: 1px solid #e0e0e0;
-			color: #31333f;
-			padding: 1rem 1.5rem;
-			border-radius: 0.5rem;
 			min-width: 180px;
+			padding: 1rem 1.5rem;
 		}
 
-		.stat-card .stat-label {
-			font-size: 0.8rem;
-			opacity: 0.9;
-			margin-bottom: 0.25rem;
-		}
-
-		.stat-card .stat-value {
-			font-size: 1.75rem;
-			font-weight: 700;
-		}
-
-		.tolerance-display {
-			font-size: 1.1rem;
-			font-weight: 600;
-			color: #ff4b4b;
-			margin-left: 0.75rem;
-		}
-
-		.legend {
-			display: flex;
-			gap: 1.5rem;
-			margin: 0.5rem 0;
-			flex-wrap: wrap;
-		}
-
-		.legend-item {
-			display: flex;
-			align-items: center;
-			gap: 0.5rem;
-			font-size: 0.9rem;
-		}
-
-		.legend-color {
-			width: 20px;
-			height: 4px;
-			border-radius: 2px;
-		}
-
-		.legend-color.original {
-			background: #3388ff;
-		}
-
-		.legend-color.optimized {
-			background: #ff4b4b;
-		}
-
-		.legend-dot {
-			width: 8px;
-			height: 8px;
-			border-radius: 50%;
-		}
-
-		.legend-dot.original {
-			background: #2563eb;
-			border: 1px solid #1d4ed8;
-		}
-
-		.legend-dot.optimized {
-			background: #ff4b4b;
-			border: 1px solid #dc2626;
-		}
-
-		.checkbox-group {
-			display: flex;
-			gap: 1.5rem;
-			flex-wrap: wrap;
-			align-items: center;
-		}
+		.legend-color.original { background: #3388ff; }
+		.legend-color.optimized { background: var(--accent-color); }
+		.legend-dot.original { background: #2563eb; border: 1px solid #1d4ed8; }
+		.legend-dot.optimized { background: var(--accent-color); border: 1px solid #dc2626; }
 
 		.checkbox-label {
 			display: flex;
@@ -215,17 +72,17 @@
 			appearance: none;
 			width: 18px;
 			height: 18px;
-			border: 2px solid #e0e0e0;
+			border: 2px solid var(--border-color);
 			border-radius: 4px;
-			background-color: #fff;
+			background-color: var(--bg-color);
 			cursor: pointer;
 			position: relative;
 			margin: 0;
 		}
 
 		.checkbox-label input[type="checkbox"]:checked {
-			background-color: #ff4b4b;
-			border-color: #ff4b4b;
+			background-color: var(--accent-color);
+			border-color: var(--accent-color);
 		}
 
 		.checkbox-label input[type="checkbox"]:checked::after {
@@ -241,60 +98,11 @@
 		}
 
 		.checkbox-label input[type="checkbox"]:hover {
-			border-color: #ff4b4b;
-		}
-
-		/* Тёмная тема */
-		@media (prefers-color-scheme: dark) {
-			.zone-generator {
-				background-color: #0e1117 !important;
-				color: #fafafa !important;
-			}
-
-			.zone-generator h1,
-			.zone-generator label {
-				color: #fafafa !important;
-			}
-
-			.zone-generator input[type="file"],
-			.zone-generator input[type="number"],
-			.zone-generator input[type="text"] {
-				background-color: #262730 !important;
-				border-color: #4f4f4f !important;
-				color: #fafafa !important;
-			}
-
-			.zone-generator input[type="range"] {
-				background: #4f4f4f;
-			}
-
-			.zone-generator .group {
-				border-color: #4f4f4f !important;
-				background-color: #262730 !important;
-			}
-
-			.zone-generator #map {
-				border-color: #4f4f4f !important;
-			}
-
-			.tolerance-display {
-				color: #ff6b6b;
-			}
-
-			.stat-card {
-				background-color: #262730;
-				border-color: #4f4f4f;
-				color: #fafafa;
-			}
-
-			.checkbox-label input[type="checkbox"] {
-				background-color: #262730;
-				border-color: #4f4f4f;
-			}
+			border-color: var(--accent-color);
 		}
 	</style>
 </head>
-<body class="zone-generator">
+<body>
 	<h1>🗺️ Оптимизатор GeoJSON</h1>
 
 	<div class="group">
@@ -303,7 +111,7 @@
 		<input type="file" id="geojsonFile" accept=".geojson,.json">
 		<div id="fileInfo" style="margin-top: 0.5rem; font-weight: 500;"></div>
 		<br>
-		<button id="loadButton">Загрузить</button>
+		<button id="loadButton" class="btn btn-primary">Загрузить</button>
 	</div>
 
 	<div id="workPanel" style="display: none;">
@@ -370,8 +178,8 @@
 		<div id="map"></div>
 
 		<div class="group">
-			<button id="downloadGeoJSONButton">Скачать GeoJSON</button>
-			<button id="downloadPlanningButton" style="display: none; margin-left: 12px;">Скачать планирование</button>
+			<button id="downloadGeoJSONButton" class="btn btn-success">💾 Скачать GeoJSON</button>
+			<button id="downloadPlanningButton" class="btn btn-success" style="display: none; margin-left: 12px;">💾 Скачать планирование</button>
 		</div>
 	</div>
 

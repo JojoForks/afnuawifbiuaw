@@ -2,164 +2,79 @@
 <html lang="ru">
 <head>
 	<meta charset="UTF-8">
+	<link rel="stylesheet" href="styles.css">
 	<script src="https://cdnjs.cloudflare.com/ajax/libs/Turf.js/6.5.0/turf.min.js"></script>
 	<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
 	<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
 	<style>
-		.zone-generator {
-			font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
-			background-color: #ffffff !important;
-			color: #31333f !important;
+		/* Специфичные стили для incompatible_zones_generator */
+		body {
+			padding: 1.5rem;
 		}
 
-		.zone-generator h1 {
-			color: #31333f !important;
-			font-weight: 600 !important;
-			margin-bottom: 1rem !important;
+		label {
+			display: inline-block;
+			min-width: 220px;
+			margin-bottom: 0.5rem;
 		}
 
-		.zone-generator label {
-			color: #31333f !important;
-			font-weight: 500 !important;
-			margin-bottom: 0.5rem !important;
-			display: inline-block !important;
-			min-width: 220px !important;
+		input[type="file"],
+		input[type="text"],
+		input[type="number"] {
+			width: 100%;
+			max-width: 400px;
+			margin-bottom: 1rem;
 		}
 
-		.zone-generator input[type="file"],
-		.zone-generator input[type="number"],
-		.zone-generator input[type="text"] {
-			background-color: #f0f2f6 !important;
-			border: 1px solid #e0e0e0 !important;
-			border-radius: 0.25rem !important;
-			color: #31333f !important;
-			padding: 0.5rem !important;
-			margin-bottom: 1rem !important;
-			width: 100% !important;
-			max-width: 400px !important;
-			font-family: inherit !important;
+		button.small {
+			padding: 2px 8px;
+			margin-left: 8px;
+			font-size: 0.875rem;
 		}
 
-		.zone-generator button {
-			background-color: #ff4b4b !important;
-			color: white !important;
-			border: none !important;
-			border-radius: 0.25rem !important;
-			padding: 0.5rem 1rem !important;
-			cursor: pointer !important;
-			font-weight: 500 !important;
-			transition: background-color 0.2s !important;
-			font-family: inherit !important;
+		#map {
+			height: 520px;
+			border: 1px solid var(--border-color);
+			border-radius: var(--radius-lg);
+			margin: 1rem 0;
 		}
 
-		.zone-generator button:hover {
-			background-color: #e63946 !important;
+		.progress-container {
+			width: 100%;
+			max-width: 400px;
+			margin: 0 auto;
 		}
 
-		.zone-generator .group {
-			border: 1px solid #e0e0e0 !important;
-			padding: 1rem !important;
-			border-radius: 0.5rem !important;
-			margin: 1rem 0 !important;
-			background-color: #f0f2f6 !important;
+		.progress-bar {
+			width: 100%;
+			height: 20px;
+			background: var(--bg-secondary);
+			border-radius: 10px;
+			overflow: hidden;
+			margin-bottom: 8px;
 		}
 
-		.zone-generator .badge {
-			display: inline-block !important;
-			padding: 2px 8px !important;
-			border-radius: 10px !important;
-			background: #eef !important;
-			margin: 2px 4px 2px 0 !important;
-		}
-
-		.zone-generator button.small {
-			padding: 2px 8px !important;
-			margin-left: 8px !important;
-			font-size: 0.875rem !important;
-		}
-
-		.zone-generator #map {
-			height: 520px !important;
-			border: 1px solid #e0e0e0 !important;
-			border-radius: 0.5rem !important;
-			margin: 1rem 0 !important;
-		}
-
-		.zone-generator pre {
-			background-color: #f0f2f6 !important;
-			border: 1px solid #e0e0e0 !important;
-			border-radius: 0.25rem !important;
-			padding: 1rem !important;
-			color: #31333f !important;
-			overflow-x: auto !important;
-			white-space: pre-wrap !important;
-			word-wrap: break-word !important;
-			font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace !important;
-			font-size: 0.875rem !important;
-		}
-
-		/* Темная тема */
-		@media (prefers-color-scheme: dark) {
-			.zone-generator {
-				background-color: #0e1117 !important;
-				color: #fafafa !important;
-			}
-
-			.zone-generator h1,
-			.zone-generator label {
-				color: #fafafa !important;
-			}
-
-			.zone-generator input[type="file"],
-			.zone-generator input[type="number"],
-			.zone-generator input[type="text"] {
-				background-color: #262730 !important;
-				border-color: #4f4f4f !important;
-				color: #fafafa !important;
-			}
-
-			.zone-generator .group {
-				border-color: #4f4f4f !important;
-				background-color: #262730 !important;
-			}
-
-			.zone-generator #map {
-				border-color: #4f4f4f !important;
-			}
-
-			.zone-generator pre {
-				background-color: #262730 !important;
-				border-color: #4f4f4f !important;
-				color: #fafafa !important;
-			}
-
-			/* Прогресс-бары в темной теме */
-			.zone-generator #loadingProgressBar,
-			.zone-generator #incompatibleProgressBar {
-				background: #28a745 !important;
-			}
-
-			/* Центрированный прогресс-бар */
-			.zone-generator #loadingProgress {
-				text-align: center !important;
-				margin: 2rem 0 !important;
-			}
+		.progress-fill {
+			height: 100%;
+			background: var(--success-color);
+			width: 0%;
+			transition: width 0.3s;
 		}
 	</style>
 </head>
-<body class="zone-generator">
-	<div id="fileSelectionPanel">
+<body>
+	<div id="fileSelectionPanel" class="group">
 		<label>Загрузите зоны по ссылке/UUID или выберите файл:</label><br><br>
-		<input type="text" id="urlInput" placeholder="UUID или ссылка на планирование" style="margin-bottom: 1rem;"><br>
+		<input type="text" id="urlInput" placeholder="UUID или ссылка на планирование"><br>
 		<input type="file" id="fileInput" accept=".geojson,.json"><br>
 		<div id="fileInfo" style="margin-bottom: 1rem; font-weight: 500;"></div>
-		<button id="loadButton">Загрузить</button>
+		<button id="loadButton" class="btn btn-primary">Загрузить</button>
 	</div>
 
 	<div id="loadingProgress" style="display:none; text-align: center; margin: 2rem 0;">
-		<div style="width:100%; max-width:400px; margin: 0 auto;">
-			<div style="width:100%; height:20px; background:#f0f2f6; border-radius:10px; overflow:hidden; margin-bottom: 8px;">
-				<div id="loadingProgressBar" style="height:100%; background:#28a745; width:0%; transition:width 0.3s;"></div>
+		<div class="progress-container">
+			<div class="progress-bar">
+				<div id="loadingProgressBar" class="progress-fill"></div>
 			</div>
 			<div id="loadingProgressText" style="font-size:0.875rem; font-weight: 500;"></div>
 		</div>
@@ -169,12 +84,12 @@
 		<div class="group">
 			<label for="distanceInput">Введите дистанцию (в метрах):</label>
 			<input type="number" id="distanceInput" value="500">
-			<button id="setIncompatibleButton" style="margin-left:12px;">Установить несовместимые зоны</button>
-			<button id="loadIncompatibleButton" style="margin-left:12px;">Загрузить несовместимости из файла</button>
+			<button id="setIncompatibleButton" class="btn btn-primary" style="margin-left:12px;">Установить несовместимые зоны</button>
+			<button id="loadIncompatibleButton" class="btn btn-secondary" style="margin-left:12px;">Загрузить несовместимости</button>
 			<input type="file" id="loadIncompatibleFileInput" accept=".json,.txt" style="display: none;">
 			<div id="incompatibleProgress" style="display:none; margin-top:8px;">
-				<div style="width:100%; height:20px; background:#f0f2f6; border-radius:10px; overflow:hidden;">
-					<div id="incompatibleProgressBar" style="height:100%; background:#ff4b4b; width:0%; transition:width 0.3s;"></div>
+				<div class="progress-bar">
+					<div id="incompatibleProgressBar" class="progress-fill" style="background: var(--accent-color);"></div>
 				</div>
 				<div id="incompatibleProgressText" style="text-align:center; margin-top:4px; font-size:0.875rem;"></div>
 			</div>
@@ -182,7 +97,7 @@
 
 		<div id="map" style="margin: 12px 0;"></div>
 
-		<button id="toggleCostSettingsButton" style="margin: 1rem 0;">Показать настройки стоимости</button>
+		<button id="toggleCostSettingsButton" class="btn btn-secondary" style="margin: 1rem 0;">Показать настройки стоимости</button>
 		<div id="costSettingsGroup" class="group" style="display: none;">
 			<h3>Генерация формулы штрафов за доп зоны</h3>
 			<div style="margin-bottom: 1rem;">
@@ -198,18 +113,18 @@
 				<label for="zonesForMaxPenaltyInput">Зон для макс. штрафа:</label><br>
 				<input type="number" id="zonesForMaxPenaltyInput" value="6" min="2" style="width: 200px; margin-bottom: 1rem;">
 			</div>
-			<button id="saveFormulaButton">Сохранить формулу</button>
-			<button id="togglePreviewButton" style="margin-left:12px;">Показать/скрыть таблицу</button>
+			<button id="saveFormulaButton" class="btn btn-primary">Сохранить формулу</button>
+			<button id="togglePreviewButton" class="btn btn-secondary" style="margin-left:12px;">Показать/скрыть таблицу</button>
 			<div id="penaltyPreview" style="margin-top: 1rem; display: none;"></div>
 		</div>
 
 		<div class="group">
 			<label for="penaltyValueInput">Штраф за несовместимость:</label>
 			<input type="number" id="penaltyValueInput" value="1000000000" min="1" style="width: 200px; margin-bottom: 1rem;"><br>
-			<button id="savePresetButton">Скачать пресет</button>
-			<button id="savePlanningButton" style="margin-left:12px; display:none;">Скачать планирование</button>
-			<button id="saveCostFormulaButton" style="margin-left:12px;">Скачать cost формулу</button>
-			<button id="selectAnotherFileButton" style="margin-left:12px;">Выбрать другой файл</button>
+			<button id="savePresetButton" class="btn btn-success">💾 Скачать пресет</button>
+			<button id="savePlanningButton" class="btn btn-success" style="margin-left:12px; display:none;">💾 Скачать планирование</button>
+			<button id="saveCostFormulaButton" class="btn btn-success" style="margin-left:12px;">💾 Скачать cost формулу</button>
+			<button id="selectAnotherFileButton" class="btn btn-secondary" style="margin-left:12px;">Выбрать другой файл</button>
 		</div>
 	</div>
 

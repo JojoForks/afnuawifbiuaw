@@ -1,0 +1,831 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, user-scalable=no, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0">
+        <meta http-equiv="X-UA-Compatible" content="ie=edge">
+        <link href="" rel="shortcut icon">
+        <title>Yandex.Routing: view the solution</title>
+        <link rel="stylesheet" href="./mvrp/main.css"/>
+    </head>
+    <body>
+        <div id="root"></div>
+        <script type="text/javascript" nonce="i0vgqMqijZOFN9J5iNdjAg&#x3D;&#x3D;">
+            window.CONFIG = '{"title":"Yandex.Routing: view the solution","mapsApiKey":{"apiKey":"4c120d0b-100b-4dd7-aaf7-e0d38d525089"},"googleMapsApi":{"apiKey":"AIzaSyDXuFSiF5Cu0-mxslRTEK9M1NinEm2jYEU"},"mappableApi":{"apiKey":"pk_zQtdRkBYGLqxmQnCGXAINZjNfOluQwCxwdMdtKBtEnAoqGNcBVHdGDmYxmBoDglM"},"metrika":{"id":94561491},"courierBackendApi":{"basePath":"https://courier.yandex.ru"},"courierBackendTestApi":{"basePath":"https://test.courier.yandex.ru"},"frontendServerApi":{"basePath":"https://yandex.ru/courier/frontend-api"},"frontendServerTestApi":{"basePath":"https://l7test.yandex.ru/courier/frontend-api"},"rumCounter":{"project":"b2bgeo-mvrp-map"},"errorCounter":{"project":"b2bgeoMvrpMap"}}';
+
+            window.DEBUG = "";
+            window.ENVIRONMENT = "";
+            window.VERSION = "d7fc6eb";
+
+            window.STATIC_BASE_PUBLIC_PATH = "/courier/mvrp-map/s3/v76-d7fc6eb";
+            window.BASE_PATH = '/courier/mvrp-map';
+        </script>
+        <script nonce="i0vgqMqijZOFN9J5iNdjAg&#x3D;&#x3D;" type="text/javascript">
+            console.info(`Version: ${window.VERSION}`);
+        </script>
+        <!-- METRIKA -->
+        <script src="https://mc.yandex.ru/metrika/tag.js"></script>
+        <script nonce="i0vgqMqijZOFN9J5iNdjAg&#x3D;&#x3D;" defer>
+            ( () => {
+                var e = {
+                    17499: () => {
+                        !function(e) {
+                            if (e.Ya = e.Ya || {},
+                            Ya.Rum)
+                                throw new Error("Rum: interface is already defined");
+                            var r = e.performance
+                              , t = r && r.timing && r.timing.navigationStart || Ya.startPageLoad || +new Date
+                              , n = e.requestAnimationFrame
+                              , o = Ya.Rum = {
+                                enabled: !!r,
+                                vsStart: document.visibilityState,
+                                vsChanged: !1,
+                                _defTimes: [],
+                                _defRes: [],
+                                _deltaMarks: {},
+                                _markListeners: {},
+                                _onComplete: [],
+                                _onInit: [],
+                                _unsubscribers: [],
+                                _settings: {},
+                                _vars: {},
+                                init: function(e, r) {
+                                    o._settings = e,
+                                    o._vars = r
+                                },
+                                getTime: r && r.now ? function() {
+                                    return r.now()
+                                }
+                                : Date.now ? function() {
+                                    return Date.now() - t
+                                }
+                                : function() {
+                                    return new Date - t
+                                }
+                                ,
+                                time: function(e) {
+                                    o._deltaMarks[e] = [o.getTime()]
+                                },
+                                timeEnd: function(e, r) {
+                                    var t = o._deltaMarks[e];
+                                    t && 0 !== t.length && t.push(o.getTime(), r)
+                                },
+                                sendTimeMark: function(e, r, t, n) {
+                                    void 0 === r && (r = o.getTime()),
+                                    o._defTimes.push([e, r, n]),
+                                    o.mark(e, r)
+                                },
+                                sendDelta: function(e, r, t, n) {
+                                    var i, a = o._deltaMarks;
+                                    a[e] || void 0 === r || (i = n && n.originalEndTime ? n.originalEndTime : o.getTime(),
+                                    a[e] = [i - r, i, t])
+                                },
+                                sendResTiming: function(e, r) {
+                                    o._defRes.push([e, r])
+                                },
+                                sendRaf: function(e) {
+                                    var r = o.getSetting("forcePaintTimeSending");
+                                    if (n && (r || !o.isVisibilityChanged())) {
+                                        var t = "2616." + e;
+                                        n((function() {
+                                            !r && o.isVisibilityChanged() || (o.getSetting("sendFirstRaf") && o.sendTimeMark(t + ".205"),
+                                            n((function() {
+                                                !r && o.isVisibilityChanged() || o.sendTimeMark(t + ".1928")
+                                            }
+                                            )))
+                                        }
+                                        ))
+                                    }
+                                },
+                                isVisibilityChanged: function() {
+                                    return o.vsStart && ("visible" !== o.vsStart || o.vsChanged)
+                                },
+                                mark: r && r.mark ? function(e, t) {
+                                    r.mark(e + (t ? ": " + t : ""))
+                                }
+                                : function() {}
+                                ,
+                                getSetting: function(e) {
+                                    var r = o._settings[e];
+                                    return null === r ? null : r || ""
+                                },
+                                on: function(e, r) {
+                                    if ("function" == typeof r)
+                                        return (o._markListeners[e] = o._markListeners[e] || []).push(r),
+                                        function() {
+                                            if (o._markListeners[e]) {
+                                                var t = o._markListeners[e].indexOf(r);
+                                                t > -1 && o._markListeners[e].splice(t, 1)
+                                            }
+                                        }
+                                },
+                                sendTrafficData: function() {},
+                                finalizeLayoutShiftScore: function() {},
+                                finalizeLargestContentfulPaint: function() {},
+                                getLCPAdditionalParams: function() {}
+                            };
+                            document.addEventListener && document.addEventListener("visibilitychange", (function e() {
+                                Ya.Rum.vsChanged = !0,
+                                document.removeEventListener("visibilitychange", e)
+                            }
+                            ))
+                        }(window)
+                    }
+                    ,
+                    23469: (e, r) => {
+                        "use strict";
+                        Object.defineProperty(r, "__esModule", {
+                            value: !0
+                        }),
+                        r.reportErrorToErrorCounter = void 0;
+                        const {errorCounter: t} = window;
+                        r.reportErrorToErrorCounter = ({error: e, meta: r}) => {
+                            t && e && t.send(e, r)
+                        }
+                    }
+                    ,
+                    32450: e => {
+                        function r() {
+                            var e;
+                            this.getSetting = function(e) {
+                                var r = this._errorSettings[e];
+                                return null === r ? null : r || ""
+                            }
+                            ,
+                            function(e, r) {
+                                var t = {
+                                    client: ["690.2354", 1e3, 100, 0],
+                                    uncaught: ["690.2361", 100, 10, 0],
+                                    external: ["690.2854", 100, 10, 0],
+                                    script: ["690.2609", 100, 10, 0]
+                                }
+                                  , n = {};
+                                r.ERROR_LEVEL = {
+                                    INFO: "info",
+                                    DEBUG: "debug",
+                                    WARN: "warn",
+                                    ERROR: "error",
+                                    FATAL: "fatal"
+                                },
+                                r._errorSettings = {
+                                    clck: "https://yandex.ru/clck/click",
+                                    beacon: !0,
+                                    project: "unknown",
+                                    page: "",
+                                    env: "",
+                                    experiments: [],
+                                    additional: {},
+                                    platform: "",
+                                    region: "",
+                                    dc: "",
+                                    host: "",
+                                    service: "",
+                                    level: "",
+                                    version: "",
+                                    yandexuid: "",
+                                    loggedin: !1,
+                                    coordinates_gp: "",
+                                    referrer: !0,
+                                    preventError: !1,
+                                    unhandledRejection: !1,
+                                    traceUnhandledRejection: !1,
+                                    uncaughtException: !0,
+                                    debug: !1,
+                                    limits: {},
+                                    silent: {},
+                                    filters: {},
+                                    pageMaxAge: 864e6,
+                                    initTimestamp: +new Date
+                                };
+                                var o = !1;
+                                function i(e, r) {
+                                    for (var t in r)
+                                        r.hasOwnProperty(t) && (e[t] = r[t]);
+                                    return e
+                                }
+                                function a(e) {
+                                    return "boolean" == typeof e && (e = +e),
+                                    "number" == typeof e ? e + "" : null
+                                }
+                                r.initErrors = function(t) {
+                                    var n = i(r._errorSettings, t);
+                                    o || (n.uncaughtException && function() {
+                                        var t = r._errorSettings;
+                                        if (e.addEventListener)
+                                            e.addEventListener("error", s),
+                                            t.resourceFails && e.addEventListener("error", c, !0),
+                                            "Promise"in e && t.unhandledRejection && e.addEventListener("unhandledrejection", (function(e) {
+                                                var t, n, o = e.reason, i = {};
+                                                o && (o.stack && o.message ? (t = o.message,
+                                                n = o.stack) : (t = String(o),
+                                                n = r._parseTraceablePromiseStack(e.promise),
+                                                "[object Event]" === t ? t = "event.type: " + o.type : "[object Object]" === t && (i.unhandledObject = o)),
+                                                o.target && o.target.src && (i.src = o.target.src),
+                                                s({
+                                                    message: "Unhandled rejection: " + t,
+                                                    stack: n,
+                                                    additional: i
+                                                }))
+                                            }
+                                            ));
+                                        else {
+                                            var n = e.onerror;
+                                            e.onerror = function(e, r, t, o, i) {
+                                                s({
+                                                    error: i || new Error(e || "Empty error"),
+                                                    message: e,
+                                                    lineno: t,
+                                                    colno: o,
+                                                    filename: r
+                                                }),
+                                                n && n.apply(this, arguments)
+                                            }
+                                        }
+                                    }(),
+                                    n.unhandledRejection && n.traceUnhandledRejection && r._traceUnhandledRejection && r._traceUnhandledRejection(),
+                                    o = !0)
+                                }
+                                ,
+                                r.updateErrors = function(e) {
+                                    i(r._errorSettings, e)
+                                }
+                                ,
+                                r.updateAdditional = function(e) {
+                                    r._errorSettings.additional = i(r._errorSettings.additional || {}, e)
+                                }
+                                ,
+                                r._handleError = function(e, o, a) {
+                                    var s, c, u = r._errorSettings;
+                                    if (u.preventError && e.preventDefault && e.preventDefault(),
+                                    o)
+                                        s = e,
+                                        c = "client";
+                                    else {
+                                        s = r._normalizeError(e),
+                                        c = s.type;
+                                        var l = u.onError;
+                                        "function" == typeof l && l(s);
+                                        var d = u.transform;
+                                        if ("function" == typeof d && (s = d(s)),
+                                        !s)
+                                            return;
+                                        s.settings && (a = s.settings)
+                                    }
+                                    var f = +new Date
+                                      , g = u.initTimestamp
+                                      , m = u.pageMaxAge;
+                                    if (!(-1 !== m && g && g + m < f)) {
+                                        var v = t[c][1];
+                                        "number" == typeof u.limits[c] && (v = u.limits[c]);
+                                        var p = t[c][2];
+                                        "number" == typeof u.silent[c] && (p = u.silent[c]);
+                                        var h = t[c][3];
+                                        if (h < v || -1 === v) {
+                                            s.path = t[c][0];
+                                            var b = r._getErrorData(s, {
+                                                silent: h < p || -1 === p ? "no" : "yes",
+                                                isCustom: Boolean(o)
+                                            }, i(i({}, u), a))
+                                              , _ = function(e) {
+                                                n[s.message] = !1,
+                                                r._sendError(e.path, e.vars),
+                                                t[c][3]++
+                                            }
+                                            .bind(this, b);
+                                            if (void 0 === u.throttleSend)
+                                                _();
+                                            else {
+                                                if (n[s.message])
+                                                    return;
+                                                n[s.message] = !0,
+                                                setTimeout(_, u.throttleSend)
+                                            }
+                                        }
+                                    }
+                                }
+                                ,
+                                r._getReferrer = function(r) {
+                                    var t = r.referrer
+                                      , n = typeof t;
+                                    return "function" === n ? t() : "string" === n && t ? t : !1 !== t && e.location ? e.location.href : void 0
+                                }
+                                ,
+                                r.getErrorSetting = function(e) {
+                                    return r._errorSettings[e]
+                                }
+                                ,
+                                r._buildExperiments = function(e) {
+                                    return e instanceof Array ? e.join(";") : ""
+                                }
+                                ,
+                                r._buildAdditional = function(e, r) {
+                                    var t = "";
+                                    try {
+                                        var n = i(i({}, e), r);
+                                        0 !== Object.keys(n).length && (t = JSON.stringify(n))
+                                    } catch (e) {}
+                                    return t
+                                }
+                                ,
+                                r._getErrorData = function(t, n, o) {
+                                    n = n || {};
+                                    var i = r._buildExperiments(o.experiments)
+                                      , s = r._buildAdditional(o.additional, t.additional)
+                                      , c = {
+                                        "-stack": t.stack,
+                                        "-url": t.file,
+                                        "-line": t.line,
+                                        "-col": t.col,
+                                        "-block": t.block,
+                                        "-method": t.method,
+                                        "-msg": t.message,
+                                        "-env": o.env,
+                                        "-external": t.external,
+                                        "-externalCustom": t.externalCustom,
+                                        "-project": o.project,
+                                        "-service": t.service || o.service,
+                                        "-page": t.page || o.page,
+                                        "-platform": o.platform,
+                                        "-level": t.level,
+                                        "-experiments": i,
+                                        "-version": o.version,
+                                        "-region": o.region,
+                                        "-dc": o.dc,
+                                        "-host": o.host,
+                                        "-yandexuid": o.yandexuid,
+                                        "-loggedin": o.loggedin,
+                                        "-coordinates_gp": t.coordinates_gp || o.coordinates_gp,
+                                        "-referrer": r._getReferrer(o),
+                                        "-source": t.source,
+                                        "-sourceMethod": t.sourceMethod,
+                                        "-type": n.isCustom ? t.type : "",
+                                        "-additional": s,
+                                        "-adb": a(Ya.blocker) || a(o.blocker),
+                                        "-cdn": e.YaStaticRegion,
+                                        "-ua": navigator.userAgent,
+                                        "-silent": n.silent,
+                                        "-ts": +new Date,
+                                        "-init-ts": o.initTimestamp
+                                    };
+                                    return o.debug && e.console && console[console[t.level] ? t.level : "error"]("[error-counter] " + t.message, c, t.stack),
+                                    {
+                                        path: t.path,
+                                        vars: c
+                                    }
+                                }
+                                ,
+                                r._baseNormalizeError = function(e) {
+                                    var r = (e = e || {}).error
+                                      , t = e.filename || e.fileName || ""
+                                      , n = r && r.stack || e.stack || ""
+                                      , o = e.message || ""
+                                      , i = r && r.additional || e.additional;
+                                    return {
+                                        file: t,
+                                        line: e.lineno || e.lineNumber,
+                                        col: e.colno || e.colNumber,
+                                        stack: n,
+                                        message: o,
+                                        additional: i
+                                    }
+                                }
+                                ,
+                                r._normalizeError = function(e) {
+                                    var t = r._baseNormalizeError(e)
+                                      , n = "uncaught"
+                                      , o = r._isExternalError(t.file, t.message, t.stack)
+                                      , i = ""
+                                      , a = "";
+                                    return o.hasExternal ? (n = "external",
+                                    i = o.common,
+                                    a = o.custom) : /^Script error\.?$/.test(t.message) && (n = "script"),
+                                    t.external = i,
+                                    t.externalCustom = a,
+                                    t.type = n,
+                                    t
+                                }
+                                ,
+                                r._createVarsString = function(e) {
+                                    var r = [];
+                                    for (var t in e)
+                                        e.hasOwnProperty(t) && (e[t] || 0 === e[t]) && r.push(t + "=" + encodeURIComponent(e[t]).replace(/\*/g, "%2A"));
+                                    return r.join(",")
+                                }
+                                ,
+                                r._sendError = function(e, t) {
+                                    r.send(null, e, r._createVarsString(t), null, null, null, null)
+                                }
+                                ;
+                                var s = function(e) {
+                                    r._handleError(e, !1)
+                                }
+                                  , c = function(e) {
+                                    var t = e.target;
+                                    if (t) {
+                                        var n = t.srcset || t.src;
+                                        if (n || (n = t.href),
+                                        n) {
+                                            var o = t.tagName || "UNKNOWN";
+                                            r.logError({
+                                                message: o + " load error",
+                                                additional: {
+                                                    src: n
+                                                }
+                                            })
+                                        }
+                                    }
+                                };
+                                r._parseTraceablePromiseStack = function() {}
+                            }("undefined" != typeof self ? self : window, this),
+                            (e = this).logError = function(r, t, n) {
+                                r = r || {},
+                                "string" != typeof t && void 0 !== t || ((t = new Error(t)).justCreated = !0);
+                                var o = r.message || ""
+                                  , i = e._baseNormalizeError(t);
+                                i.message && !r.ignoreErrorMessage && (o && (o += "; "),
+                                o += i.message),
+                                i.message = o || "Empty error";
+                                for (var a = ["service", "source", "type", "block", "additional", "level", "page", "method", "sourceMethod", "coordinates_gp"], s = 0; s < a.length; s++) {
+                                    var c = a[s];
+                                    r[c] ? i[c] = r[c] : t && t[c] && (i[c] = t[c])
+                                }
+                                e._handleError(i, !0, n)
+                            }
+                            ,
+                            function(e) {
+                                function r() {
+                                    var r = e.getSetting("clck")
+                                      , t = e.countersBatchData.join("\r\n");
+                                    if (e.countersBatchData = [],
+                                    e.counterTimerId = null,
+                                    r && !(navigator.sendBeacon && e.getSetting("beacon") && navigator.sendBeacon(r, t)))
+                                        if ("undefined" != typeof self && self.fetch)
+                                            fetch(r, {
+                                                method: "POST",
+                                                body: t
+                                            }).catch((function() {}
+                                            ));
+                                        else {
+                                            var n = new XMLHttpRequest;
+                                            n.open("POST", r),
+                                            n.send(t)
+                                        }
+                                }
+                                e.countersBatchData = [],
+                                e.counterTimerId,
+                                e.send = function(t, n, o, i, a, s, c) {
+                                    clearTimeout(e.counterTimerId);
+                                    var u = function(r, t, n, o, i, a) {
+                                        var s = e.getSetting("slots");
+                                        return [a ? "/" + a.join("/") : "", "/path=" + t, s ? "/slots=" + s.join(";") : "", n ? "/vars=" + n : "", "/cts=" + (new Date).getTime(), "/*"]
+                                    }(0, n, o, 0, 0, c);
+                                    e.countersBatchData.push("/reqid=" + e.getSetting("reqid") + u.join("")),
+                                    e.countersBatchData.length < 42 ? e.counterTimerId = setTimeout(r, 15) : r()
+                                }
+                            }(this),
+                            function(e) {
+                                var r = {
+                                    url: {
+                                        0: /(miscellaneous|extension)_bindings/,
+                                        1: /^chrome:/,
+                                        2: /kaspersky-labs\.com\//,
+                                        3: /^(?:moz|chrome|safari)-extension:\/\//,
+                                        4: /^file:/,
+                                        5: /^resource:\/\//,
+                                        6: /webnetc\.top/,
+                                        7: /local\.adguard\.com/
+                                    },
+                                    message: {
+                                        0: /__adgRemoveDirect/,
+                                        1: /Content Security Policy/,
+                                        2: /vid_mate_check/,
+                                        3: /ucapi/,
+                                        4: /Access is denied/i,
+                                        5: /^Uncaught SecurityError/i,
+                                        6: /__ybro/,
+                                        7: /__show__deepen/,
+                                        8: /ntp is not defined/,
+                                        9: /Cannot set property 'install' of undefined/,
+                                        10: /NS_ERROR/,
+                                        11: /Error loading script/,
+                                        12: /^TypeError: undefined is not a function$/,
+                                        13: /__firefox__\.(?:favicons|metadata|reader|searchQueryForField|searchLoginField)/
+                                    },
+                                    stack: {
+                                        0: /(?:moz|chrome|safari)-extension:\/\//,
+                                        1: /adguard.*\.user\.js/i
+                                    }
+                                };
+                                function t(e, r) {
+                                    if (e && r) {
+                                        var t = [];
+                                        for (var n in r)
+                                            if (r.hasOwnProperty(n)) {
+                                                var o = r[n];
+                                                "string" == typeof o && (o = new RegExp(o)),
+                                                o instanceof RegExp && o.test(e) && t.push(n)
+                                            }
+                                        return t.join("_")
+                                    }
+                                }
+                                function n(e, n) {
+                                    var o, i = [];
+                                    for (var a in r)
+                                        r.hasOwnProperty(a) && (o = t(e[a], n[a])) && i.push(a + "~" + o);
+                                    return i.join(";")
+                                }
+                                e._isExternalError = function(t, o, i) {
+                                    var a = e._errorSettings.filters || {}
+                                      , s = {
+                                        url: (t || "") + "",
+                                        message: (o || "") + "",
+                                        stack: (i || "") + ""
+                                    }
+                                      , c = n(s, r)
+                                      , u = n(s, a);
+                                    return {
+                                        common: c,
+                                        custom: u,
+                                        hasExternal: !(!c && !u)
+                                    }
+                                }
+                            }(this)
+                        }
+                        window.Ya = window.Ya || {},
+                        void 0 !== e.exports ? (e.exports = r,
+                        e.exports.default = r) : window.Ya.ErrorLogger = r
+                    }
+                    ,
+                    35752: (e, r, t) => {
+                        "use strict";
+                        Object.defineProperty(r, "__esModule", {
+                            value: !0
+                        }),
+                        r.logError = void 0;
+                        var n = t(59022)
+                          , o = t(45862);
+                        const i = () => {
+                            switch (window.ENVIRONMENT) {
+                            case "testing":
+                            case "stands":
+                            case "experiment":
+                                return "testing";
+                            case "production":
+                                return "production";
+                            default:
+                                return "development"
+                            }
+                        }
+                        ;
+                        !function() {
+                            var e;
+                            if ("development" === window.ENVIRONMENT)
+                                return;
+                            const r = new n.ErrorCounter({
+                                project: (null === (e = o.config.errorCounter) || void 0 === e ? void 0 : e.project) || "b2bgeoMvrpMap",
+                                uncaughtException: !0,
+                                env: i(),
+                                version: window.VERSION
+                            });
+                            window.errorCounter = r
+                        }(),
+                        r.logError = (e, r) => {
+                            window.errorCounter && window.errorCounter.send(r, e)
+                        }
+                    }
+                    ,
+                    45862: (e, r) => {
+                        "use strict";
+                        Object.defineProperty(r, "__esModule", {
+                            value: !0
+                        }),
+                        r.config = void 0,
+                        r.config = ( () => {
+                            let e = {};
+                            try {
+                                e = JSON.parse(window.CONFIG)
+                            } catch (e) {
+                                console.error(e)
+                            }
+                            return e
+                        }
+                        )()
+                    }
+                    ,
+                    59022: (e, r, t) => {
+                        "use strict";
+                        Object.defineProperty(r, "__esModule", {
+                            value: !0
+                        }),
+                        r.ErrorCounter = void 0;
+                        var n, o = (n = t(32450)) && n.__esModule ? n : {
+                            default: n
+                        };
+                        function i(e, r) {
+                            var t = Object.keys(e);
+                            if (Object.getOwnPropertySymbols) {
+                                var n = Object.getOwnPropertySymbols(e);
+                                r && (n = n.filter((function(r) {
+                                    return Object.getOwnPropertyDescriptor(e, r).enumerable
+                                }
+                                ))),
+                                t.push.apply(t, n)
+                            }
+                            return t
+                        }
+                        function a(e) {
+                            for (var r = 1; r < arguments.length; r++) {
+                                var t = null != arguments[r] ? arguments[r] : {};
+                                r % 2 ? i(Object(t), !0).forEach((function(r) {
+                                    s(e, r, t[r])
+                                }
+                                )) : Object.getOwnPropertyDescriptors ? Object.defineProperties(e, Object.getOwnPropertyDescriptors(t)) : i(Object(t)).forEach((function(r) {
+                                    Object.defineProperty(e, r, Object.getOwnPropertyDescriptor(t, r))
+                                }
+                                ))
+                            }
+                            return e
+                        }
+                        function s(e, r, t) {
+                            return (r = function(e) {
+                                var r = function(e) {
+                                    if ("object" != typeof e || !e)
+                                        return e;
+                                    var r = e[Symbol.toPrimitive];
+                                    if (void 0 !== r) {
+                                        var t = r.call(e, "string");
+                                        if ("object" != typeof t)
+                                            return t;
+                                        throw new TypeError("@@toPrimitive must return a primitive value.")
+                                    }
+                                    return String(e)
+                                }(e);
+                                return "symbol" == typeof r ? r : r + ""
+                            }(r))in e ? Object.defineProperty(e, r, {
+                                value: t,
+                                enumerable: !0,
+                                configurable: !0,
+                                writable: !0
+                            }) : e[r] = t,
+                            e
+                        }
+                        class c {
+                            constructor(e) {
+                                s(this, "breadCrumbs", []),
+                                s(this, "breadCrumbsCursor", 0),
+                                s(this, "getAll", ( () => [...this.breadCrumbs.slice(0, this.breadCrumbsCursor), ...this.breadCrumbs.slice(this.breadCrumbsCursor)])),
+                                s(this, "add", (e => {
+                                    this.breadCrumbs[this.breadCrumbsCursor] = e,
+                                    this.breadCrumbsCursor += 1,
+                                    this.breadCrumbsCursor === this.breadCrumbs.length && (this.breadCrumbsCursor = 0)
+                                }
+                                )),
+                                this.breadCrumbs = new Array(e),
+                                this.breadCrumbsCursor = 0
+                            }
+                        }
+                        r.ErrorCounter = class {
+                            constructor(e, r) {
+                                s(this, "config", {
+                                    maxBreadCrubmsLength: 20
+                                }),
+                                s(this, "additional", null),
+                                s(this, "updateAdditional", (e => {
+                                    this.additional = e
+                                }
+                                )),
+                                s(this, "addBreadCrumb", (e => {
+                                    this.breadCrumbsCollector.add(e)
+                                }
+                                )),
+                                s(this, "send", ( (e, r) => {
+                                    this.logger.logError({
+                                        message: null == e ? void 0 : e.message,
+                                        level: "error",
+                                        additional: a(a({
+                                            breadCrumbs: this.breadCrumbsCollector.getAll()
+                                        }, this.additional), r)
+                                    }, e)
+                                }
+                                )),
+                                this.logger = new o.default,
+                                this.logger.initErrors(a(a({}, e), {}, {
+                                    uncaughtException: !0
+                                })),
+                                this.config = a(a({}, this.config), r),
+                                this.breadCrumbsCollector = new c(this.config.maxBreadCrubmsLength)
+                            }
+                        }
+                    }
+                    ,
+                    60209: () => {
+                        !function() {
+                            if (window.PerformanceLongTaskTiming) {
+                                var e = function(e, r) {
+                                    return (e = e.concat(r)).length > 300 && (e = e.slice(e.length - 300)),
+                                    e
+                                };
+                                function r() {
+                                    var r = Ya.Rum._tti = {
+                                        events: [],
+                                        eventsAfterTTI: [],
+                                        fired: !1,
+                                        observer: new PerformanceObserver((function(t) {
+                                            var n = t.getEntries();
+                                            r.events = e(r.events, n),
+                                            r.fired && (r.eventsAfterTTI = e(r.eventsAfterTTI, n))
+                                        }
+                                        ))
+                                    };
+                                    r.observer.observe({
+                                        entryTypes: ["longtask"]
+                                    }),
+                                    Ya.Rum._unsubscribers && Ya.Rum._unsubscribers.push((function() {
+                                        r.observer.disconnect()
+                                    }
+                                    ))
+                                }
+                                r(),
+                                Ya.Rum._onInit.push(r)
+                            }
+                        }()
+                    }
+                    ,
+                    62864: (e, r, t) => {
+                        "use strict";
+                        try {
+                            t(17499),
+                            t(60209)
+                        } catch (e) {
+                            console.error(e)
+                        }
+                    }
+                    ,
+                    96934: (e, r, t) => {
+                        "use strict";
+                        t(62864)
+                    }
+                }
+                  , r = {};
+                function t(n) {
+                    var o = r[n];
+                    if (void 0 !== o)
+                        return o.exports;
+                    var i = r[n] = {
+                        exports: {}
+                    };
+                    return e[n](i, i.exports, t),
+                    i.exports
+                }
+                ( () => {
+                    "use strict";
+                    t(35752),
+                    t(96934);
+                    var e = t(45862)
+                      , r = t(23469);
+                    window.Ya && window.Ya.Metrika2 && (window.metrika = new window.Ya.Metrika2(e.config.metrika)),
+                    window.reportErrorToMetrika = (e, r, t) => {
+                        window.metrika ? window.metrika.reachGoal("uptime", {
+                            type: r,
+                            level: e,
+                            err: t
+                        }) : (console.log("report to metrika"),
+                        console.log(e, r, t))
+                    }
+                    ,
+                    window.onerror = (e, t, n, o, i) => {
+                        i ? null != i && i.message && /Ignored attempt to cancel a .+ event with cancelable=false/.test(i.message) ? console.warn("Minor map error, ignored!", {
+                            event: e,
+                            source: t,
+                            lineno: n,
+                            colno: o,
+                            error: i
+                        }) : (window.reportErrorToMetrika("error", "JS_ERROR", i),
+                        (0,
+                        r.reportErrorToErrorCounter)({
+                            error: i,
+                            meta: {
+                                source: "window.onerror"
+                            }
+                        })) : console.warn("Empty error skip!", {
+                            event: e,
+                            source: t,
+                            lineno: n,
+                            colno: o,
+                            error: i
+                        })
+                    }
+                }
+                )()
+            }
+            )();
+        </script>
+        <noscript>
+            <div>
+                <img src="https://mc.yandex.ru/watch/94561491" style="position:absolute; left:-9999px;" alt=""/>
+            </div>
+        </noscript>
+        <!-- APP -->
+        <script src="./mvrp/main.js"></script>
+    </body>
+</html>

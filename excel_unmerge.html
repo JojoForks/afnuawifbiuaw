@@ -7,48 +7,59 @@
     <link rel="stylesheet" href="styles.css">
     <style>
         body {
-            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            overflow: hidden;
         }
 
-        .container {
+        #workPanel {
+            flex: 1;
+            padding: 20px;
+            overflow-y: auto;
+        }
+
+        .card {
+            background: var(--bg-secondary);
+            padding: 20px;
+            border-radius: var(--radius-md);
+            border: 1px solid var(--border-color);
             max-width: 600px;
         }
 
-        h1 {
-            margin-bottom: 2rem;
-            text-align: center;
-            padding-bottom: 1rem;
-            border-bottom: 1px solid var(--border-color);
-        }
-
-        .btn-group {
-            display: flex;
-            gap: 10px;
-            margin-top: 1.5rem;
+        select {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-sm);
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            margin-bottom: 15px;
         }
     </style>
 </head>
 <body>
-    <div class="container">
-        <h1>Разъединение объединенных ячеек Excel</h1>
+    <header class="app-header">
+        <div class="header-left">
+            <h1>Разъединение ячеек Excel<span class="info-icon" data-tooltip="Разбивает объединенные ячейки в Excel и заполняет их одинаковыми значениями.">ℹ️</span></h1>
+        </div>
+        <div class="controls">
+            <input type="file" id="excelFile" accept=".xlsx,.xls">
+            <button id="downloadBtn" class="btn btn-success" style="display:none; margin-left: 10px;">💾 Скачать результат</button>
+        </div>
+    </header>
 
+    <div id="workPanel">
         <div class="card">
             <div class="form-group">
-                <label>Выберите Excel файл (.xlsx):</label>
-                <input type="file" id="excelFile" accept=".xlsx,.xls">
-            </div>
-
-            <div class="form-group">
-                <label>Выберите лист:</label>
+                <label style="display: block; margin-bottom: 8px;">Выберите лист:</label>
                 <select id="sheetName" disabled>
                     <option value="">Сначала загрузите файл</option>
                 </select>
             </div>
 
-            <div class="btn-group">
-                <button id="processBtn" class="btn btn-primary">Обработать файл</button>
-                <button id="downloadBtn" class="btn btn-success" style="display:none">Скачать обработанный файл</button>
-            </div>
+            <button id="processBtn" class="btn btn-primary">Обработать файл</button>
+            <div id="status" style="margin-top: 10px; color: var(--text-secondary);"></div>
         </div>
     </div>
 
@@ -230,7 +241,7 @@
             processBtn.disabled = false;
             if (success) {
                 processBtn.textContent = 'Файл обработан';
-                downloadBtn.style.display = 'inline';
+                downloadBtn.style.display = 'inline-block';
             } else {
                 processBtn.textContent = 'Обработать файл';
             }

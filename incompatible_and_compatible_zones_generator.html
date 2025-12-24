@@ -9,18 +9,28 @@
 	<style>
 		/* Специфичные стили для incompatible_zones_generator */
 		body {
-			padding: 1.5rem;
+			display: flex;
+			flex-direction: column;
+			height: 100vh;
+			overflow: hidden;
+			margin: 0;
 		}
 
-		label {
+		#workPanel {
+			flex: 1;
+			padding: 1.5rem;
+			overflow-y: auto;
+		}
+
+		#workPanel label {
 			display: inline-block;
 			min-width: 220px;
 			margin-bottom: 0.5rem;
 		}
 
-		input[type="file"],
-		input[type="text"],
-		input[type="number"] {
+		#workPanel input[type="file"],
+		#workPanel input[type="text"],
+		#workPanel input[type="number"] {
 			width: 100%;
 			max-width: 400px;
 			margin-bottom: 1rem;
@@ -64,16 +74,44 @@
 			width: 0%;
 			transition: width 0.3s;
 		}
+
+		/* Header styles overrides */
+		/* .app-header .input-group {
+			display: flex;
+			align-items: center;
+			gap: 8px;
+		} */
+
+		/* .app-header .url-input {
+			width: 300px !important;
+			margin-bottom: 0 !important;
+		} */
+
+		.app-header input[type="file"] {
+			width: auto !important;
+			margin-bottom: 0 !important;
+		}
+
+		.app-header .btn {
+			margin-bottom: 0 !important;
+		}
 	</style>
 </head>
 <body>
-	<div id="fileSelectionPanel" class="group">
-		<label>Загрузите зоны по ссылке/UUID или выберите файл:</label><br><br>
-		<input type="text" id="urlInput" placeholder="UUID или ссылка на планирование"><br>
-		<input type="file" id="fileInput" accept=".geojson,.json"><br>
-		<div id="fileInfo" style="margin-bottom: 1rem; font-weight: 500;"></div>
-		<button id="loadButton" class="btn btn-primary">Загрузить</button>
-	</div>
+	<header class="app-header">
+		<div class="header-left">
+			<h1>Совместимость зон<span class="info-icon" data-tooltip="Инструмент для формирования несовместимостей зон.">ℹ️</span></h1>
+		</div>
+		<div class="controls">
+			<div class="input-group">
+				<input type="text" id="urlInput" class="url-input" placeholder="UUID или ссылка">
+				<button id="loadButton" class="btn btn-load">Загрузить</button>
+			</div>
+			<div class="divider"></div>
+			<input type="file" id="fileInput" accept=".geojson,.json">
+		</div>
+	</header>
+
 
 	<div id="loadingProgress" style="display:none; text-align: center; margin: 2rem 0;">
 		<div class="progress-container">
@@ -85,6 +123,7 @@
 	</div>
 
 	<div id="workPanel" style="display:none;">
+		<div id="fileInfo" style="margin-bottom: 1rem; font-weight: 500;"></div>
 		<div class="group">
 			<label for="distanceInput">Введите дистанцию (в метрах):</label>
 			<input type="number" id="distanceInput" value="500">
@@ -128,7 +167,6 @@
 			<button id="savePresetButton" class="btn btn-success">💾 Скачать пресет</button>
 			<button id="savePlanningButton" class="btn btn-success" style="margin-left:12px; display:none;">💾 Скачать планирование</button>
 			<button id="saveCostFormulaButton" class="btn btn-success" style="margin-left:12px;">💾 Скачать cost формулу</button>
-			<button id="selectAnotherFileButton" class="btn btn-secondary" style="margin-left:12px;">Выбрать другой файл</button>
 		</div>
 	</div>
 
@@ -162,130 +200,131 @@
 		document.getElementById('fileInput').addEventListener('change', (e) => {
 			const file = e.target.files[0];
 			const fileInfo = document.getElementById('fileInfo');
+            const progressDiv = document.getElementById('loadingProgress');
+            const progressText = document.getElementById('loadingProgressText');
 
-			if (file) {
-				const reader = new FileReader();
-				reader.onload = function(e) {
-					try {
-						const data = JSON.parse(e.target.result);
-						const fileType = determineFileType(data);
+			if (!file) return;
 
-						if (fileType === 'planning') {
-							planningData = data;
-							loadedGeoJSON = null;
-							const zoneCount = data.zones ? data.zones.length : 0;
-							fileInfo.textContent = `Выбран файл планирования с ${zoneCount} зон(ами)`;
-							fileInfo.style.color = '#28a745';
-						} else if (fileType === 'geojson') {
-							loadedGeoJSON = data;
-							planningData = null;
-							const zoneCount = data.features ? data.features.length : 0;
-							fileInfo.textContent = `Выбран файл GeoJSON с ${zoneCount} зон(ами)`;
-							fileInfo.style.color = '#007bff';
-						} else {
-							fileInfo.textContent = 'Неподдерживаемый формат файла';
-							fileInfo.style.color = '#dc3545';
-							planningData = null;
-							loadedGeoJSON = null;
-						}
-					} catch (error) {
-						fileInfo.textContent = 'Ошибка при чтении файла: ' + error.message;
-						fileInfo.style.color = '#dc3545';
-						planningData = null;
-						loadedGeoJSON = null;
-					}
-				};
-				reader.readAsText(file);
-			} else {
-				fileInfo.textContent = '';
-				planningData = null;
-				loadedGeoJSON = null;
-			}
+            const reader = new FileReader();
+            reader.onload = async function(e) {
+                try {
+                    const data = JSON.parse(e.target.result);
+                    const fileType = determineFileType(data);
+
+                    if (fileType === 'planning') {
+                        planningData = data;
+                        loadedGeoJSON = null;
+                        const zoneCount = data.zones ? data.zones.length : 0;
+                        fileInfo.textContent = `Загружен файл планирования: ${zoneCount} зон(ами)`;
+                        fileInfo.style.color = '#28a745';
+                    } else if (fileType === 'geojson') {
+                        loadedGeoJSON = data;
+                        planningData = null;
+                        const zoneCount = data.features ? data.features.length : 0;
+                        fileInfo.textContent = `Загружен файл GeoJSON: ${zoneCount} зон(ами)`;
+                        fileInfo.style.color = '#007bff';
+                    } else {
+                        throw new Error('Неподдерживаемый формат файла');
+                    }
+
+                    // Автозагрузка
+                    progressDiv.style.display = 'block';
+                    progressText.textContent = 'Инициализация...';
+
+                    await initializeMapOnly();
+                    document.getElementById('workPanel').style.display = 'block';
+                    await new Promise(resolve => setTimeout(resolve, 50));
+                    if (map) map.invalidateSize();
+
+                    if (planningData) {
+                        progressText.textContent = 'Обработка планирования...';
+                        await processPlanningData();
+                        document.getElementById('savePlanningButton').style.display = 'inline-block';
+                    } else if (loadedGeoJSON) {
+                        progressText.textContent = 'Обработка GeoJSON...';
+                        await processGeoJSON(loadedGeoJSON);
+                        document.getElementById('savePlanningButton').style.display = 'none';
+                    }
+                    
+                    progressDiv.style.display = 'none';
+
+                } catch (error) {
+                    console.error(error);
+                    fileInfo.textContent = 'Ошибка: ' + error.message;
+                    fileInfo.style.color = '#dc3545';
+                    document.getElementById('workPanel').style.display = 'block'; // Показать ошибку
+                    progressDiv.style.display = 'none';
+                }
+            };
+            reader.readAsText(file);
 		});
 
 		document.getElementById('loadButton').addEventListener('click', async () => {
 			const urlInput = document.getElementById('urlInput').value.trim();
 			const progressDiv = document.getElementById('loadingProgress');
-			const progressBar = document.getElementById('loadingProgressBar');
 			const progressText = document.getElementById('loadingProgressText');
+            const fileInfo = document.getElementById('fileInfo');
 
-			// Приоритет: URL > файл
-			if (urlInput) {
-				const uuidMatch = urlInput.match(/([a-f0-9]+-[a-f0-9]+-[a-f0-9]+-[a-f0-9]+)/i);
-				if (!uuidMatch) {
-					return alert('Не удалось найти UUID');
-				}
+			if (!urlInput) {
+                alert('Введите UUID или ссылку');
+                return;
+            }
 
-				const uuid = uuidMatch[0];
-				const apiUrl = `https://routeq.gens.codes/request/${uuid}`;
+            const uuidMatch = urlInput.match(/([a-f0-9]+-[a-f0-9]+-[a-f0-9]+-[a-f0-9]+)/i);
+            if (!uuidMatch) {
+                return alert('Не удалось найти UUID');
+            }
 
-				document.getElementById('fileSelectionPanel').style.display = 'none';
-				progressDiv.style.display = 'block';
-				progressText.textContent = `Загрузка данных: ${uuid}...`;
+            const uuid = uuidMatch[0];
+            const apiUrl = `https://routeq.gens.codes/request/${uuid}`;
 
-				try {
-					const response = await fetch(apiUrl);
-					if (!response.ok) throw new Error(`Ошибка: ${response.status}`);
-					const data = await response.json();
-					
-					const fileType = determineFileType(data);
-					if (fileType === 'planning') {
-						planningData = data;
-						loadedGeoJSON = null;
-					} else if (fileType === 'geojson') {
-						loadedGeoJSON = data;
-						planningData = null;
-					} else {
-						throw new Error('Неподдерживаемый формат данных');
-					}
+            progressDiv.style.display = 'block';
+            progressText.textContent = `Загрузка данных: ${uuid}...`;
 
-					await initializeMapOnly();
-					document.getElementById('workPanel').style.display = 'block';
-					await new Promise(resolve => setTimeout(resolve, 50));
-					if (map) map.invalidateSize();
+            try {
+                const response = await fetch(apiUrl);
+                if (!response.ok) throw new Error(`Ошибка: ${response.status}`);
+                const data = await response.json();
+                
+                const fileType = determineFileType(data);
+                if (fileType === 'planning') {
+                    planningData = data;
+                    loadedGeoJSON = null;
+                    fileInfo.textContent = `Загружено планирование (UUID: ${uuid})`;
+                    fileInfo.style.color = '#28a745';
+                } else if (fileType === 'geojson') {
+                    loadedGeoJSON = data;
+                    planningData = null;
+                    fileInfo.textContent = `Загружен GeoJSON (UUID: ${uuid})`;
+                    fileInfo.style.color = '#007bff';
+                } else {
+                    throw new Error('Неподдерживаемый формат данных');
+                }
 
-					if (planningData) {
-						progressText.textContent = 'Обработка планирования...';
-						await processPlanningData();
-						document.getElementById('savePlanningButton').style.display = 'inline-block';
-					} else if (loadedGeoJSON) {
-						progressText.textContent = 'Загрузка зон...';
-						await processGeoJSON(loadedGeoJSON);
-						document.getElementById('savePlanningButton').style.display = 'none';
-					}
-				} catch (err) {
-					console.error(err);
-					alert(`Ошибка загрузки: ${err.message}`);
-					document.getElementById('fileSelectionPanel').style.display = 'block';
-					progressDiv.style.display = 'none';
-				}
-				return;
-			}
+                await initializeMapOnly();
+                document.getElementById('workPanel').style.display = 'block';
+                await new Promise(resolve => setTimeout(resolve, 50));
+                if (map) map.invalidateSize();
 
-			// Загрузка из файла
-			if (!planningData && !loadedGeoJSON) {
-				alert('Введите ссылку/UUID или выберите файл.');
-				return;
-			}
+                if (planningData) {
+                    progressText.textContent = 'Обработка планирования...';
+                    await processPlanningData();
+                    document.getElementById('savePlanningButton').style.display = 'inline-block';
+                } else if (loadedGeoJSON) {
+                    progressText.textContent = 'Загрузка зон...';
+                    await processGeoJSON(loadedGeoJSON);
+                    document.getElementById('savePlanningButton').style.display = 'none';
+                }
+                
+                progressDiv.style.display = 'none';
 
-			document.getElementById('fileSelectionPanel').style.display = 'none';
-			progressDiv.style.display = 'block';
-			progressText.textContent = 'Инициализация карты...';
-
-			await initializeMapOnly();
-			document.getElementById('workPanel').style.display = 'block';
-			await new Promise(resolve => setTimeout(resolve, 50));
-			if (map) map.invalidateSize();
-
-			if (planningData) {
-				progressText.textContent = 'Обработка файла планирования...';
-				await processPlanningData();
-				document.getElementById('savePlanningButton').style.display = 'inline-block';
-			} else if (loadedGeoJSON) {
-				progressText.textContent = 'Загрузка зон на карту...';
-				await processGeoJSON(loadedGeoJSON);
-				document.getElementById('savePlanningButton').style.display = 'none';
-			}
+            } catch (err) {
+                console.error(err);
+                fileInfo.textContent = `Ошибка загрузки: ${err.message}`;
+                fileInfo.style.color = '#dc3545';
+                document.getElementById('workPanel').style.display = 'block';
+                progressDiv.style.display = 'none';
+            }
 		});
 
 		document.getElementById('setIncompatibleButton').addEventListener('click', async () => {
@@ -522,42 +561,6 @@
 		const formula = buildIncompatibilityCostFormula(incompatibleExport, compatibleExport, penalty);
 		downloadJsonFile({ cost: formula }, 'incompatibility_cost_formula.json');
 	});
-
-		document.getElementById('selectAnotherFileButton').addEventListener('click', () => {
-			resetToFileSelection();
-		});
-
-		function resetToFileSelection() {
-			document.getElementById('workPanel').style.display = 'none';
-			document.getElementById('loadingProgress').style.display = 'none';
-
-			document.getElementById('fileSelectionPanel').style.display = 'block';
-
-			components = [];
-			zoneNameToComponentIndex = new Map();
-			compatibleGroups = [];
-			compatibleGroupsSet = new Set();
-			allZoneNames = [];
-			adjacencyGlobal = new Map();
-			selectedNeighborsByZone = new Map();
-			planningData = null;
-			loadedGeoJSON = null;
-			currentFeatures = null;
-
-			if (map) {
-				map.remove();
-				map = null;
-			}
-
-			document.getElementById('fileInfo').textContent = '';
-
-			document.getElementById('loadingProgressBar').style.width = '0%';
-			document.getElementById('incompatibleProgressBar').style.width = '0%';
-
-			document.getElementById('fileInput').value = '';
-			document.getElementById('urlInput').value = '';
-			document.getElementById('savePlanningButton').style.display = 'none';
-		}
 
 		function extractCompatibleGroupsFromPlanning() {
 			if (!planningData || !planningData.options || !planningData.options.compatible_zones) {
@@ -1146,14 +1149,14 @@ function applyStreamlitStyles() {
     document.body.style.backgroundColor = theme.bg;
     document.body.style.color = theme.text;
 
-    const headings = document.querySelectorAll('h1');
+    const headings = document.querySelectorAll('#workPanel h1');
     headings.forEach(h => {
         h.style.color = theme.text;
         h.style.fontWeight = '600';
         h.style.marginBottom = '1rem';
     });
 
-    const labels = document.querySelectorAll('label');
+    const labels = document.querySelectorAll('#workPanel label');
     labels.forEach(label => {
         label.style.color = theme.text;
         label.style.fontWeight = '500';
@@ -1162,7 +1165,7 @@ function applyStreamlitStyles() {
         label.style.minWidth = '220px';
     });
 
-    const inputs = document.querySelectorAll('input[type="file"], input[type="number"], input[type="text"]');
+    const inputs = document.querySelectorAll('#workPanel input[type="file"], #workPanel input[type="number"], #workPanel input[type="text"]');
     inputs.forEach(input => {
         input.style.backgroundColor = theme.secondary;
         input.style.border = `1px solid ${theme.border}`;
@@ -1175,7 +1178,7 @@ function applyStreamlitStyles() {
         input.style.fontFamily = 'inherit';
     });
 
-    const buttons = document.querySelectorAll('button');
+    const buttons = document.querySelectorAll('#workPanel button');
     buttons.forEach(button => {
         button.style.backgroundColor = theme.primary;
         button.style.color = 'white';

@@ -26,9 +26,50 @@
             margin-bottom: 20px;
         }
 
+        .settings-grid {
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+        }
+
+        .setting-group {
+            flex: 1;
+            min-width: 280px;
+            background: var(--bg-secondary);
+            padding: 20px;
+            border-radius: var(--radius-md);
+            border: 1px solid var(--border-color);
+        }
+
+        .setting-group h4 {
+            margin-bottom: 15px;
+            color: var(--text-color);
+            font-size: 1rem;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 10px;
+        }
+
+        .setting-item {
+            display: flex;
+            align-items: flex-start;
+            margin-bottom: 12px;
+        }
+
+        .setting-checkbox {
+            margin-top: 4px;
+            margin-right: 10px;
+        }
+
+        .setting-label {
+            font-size: 0.9rem;
+            cursor: pointer;
+            line-height: 1.4;
+        }
+
         .sub-settings {
             margin-left: 24px;
             margin-top: 8px;
+            margin-bottom: 12px;
         }
 
         .radio-group {
@@ -75,7 +116,9 @@
 </head>
 <body>
     <header class="app-header">
-        <h1>initial_routes generator</h1>
+        <div class="header-left">
+            <h1>initial_routes generator<span class="info-icon" data-tooltip="Формирование массива initial_routes из результата планирования. Можно закрепить маршруты и настроить параметры закрпления.">ℹ️</span></h1>
+        </div>
         <div class="controls">
             <div class="input-group">
                 <input type="text" id="urlInput" class="url-input" placeholder="UUID или ссылка на результат">
@@ -83,6 +126,7 @@
             </div>
             <div class="divider"></div>
             <input type="file" id="fileInput" accept=".json">
+            <button onclick="saveFile()" id="headerSaveBtn" class="btn btn-primary" style="display: none;">💾 Сохранить</button>
         </div>
     </header>
 
@@ -175,9 +219,6 @@
             <div class="stats" id="stats"></div>
 
             <div class="result-controls">
-                <button class="btn btn-primary" id="downloadBtn">
-                    💾 Скачать JSON
-                </button>
                 <button class="btn btn-secondary" id="copyBtn">
                     📋 Копировать
                 </button>
@@ -212,7 +253,6 @@
         const fileInput = document.getElementById('fileInput');
         const status = document.getElementById('status');
         const resultSection = document.getElementById('resultSection');
-        const downloadBtn = document.getElementById('downloadBtn');
         const copyBtn = document.getElementById('copyBtn');
         const stats = document.getElementById('stats');
 
@@ -238,6 +278,7 @@
         // Элементы URL загрузки
         const urlInput = document.getElementById('urlInput');
         const loadUrlBtn = document.getElementById('loadUrlBtn');
+        const headerSaveBtn = document.getElementById('headerSaveBtn');
 
         // Обработчики загрузки файла
         fileInput.addEventListener('change', handleFileSelect);
@@ -596,6 +637,7 @@
             jsonEditor.set(processedData);
             settingsSection.style.display = 'block';
             resultSection.style.display = 'block';
+            headerSaveBtn.style.display = 'flex';
         }
 
         function showStatus(message, type) {
@@ -604,8 +646,7 @@
             status.style.display = 'block';
         }
 
-        // Скачивание файла
-        downloadBtn.addEventListener('click', () => {
+        function saveFile() {
             if (!processedData) return;
 
             const dataStr = JSON.stringify(processedData, null, 2);
@@ -617,7 +658,7 @@
             linkElement.setAttribute('href', dataUri);
             linkElement.setAttribute('download', exportFileDefaultName);
             linkElement.click();
-        });
+        }
 
         // Копирование в буфер
         copyBtn.addEventListener('click', async () => {

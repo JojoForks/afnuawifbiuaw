@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Редактор Геозон (NovaBev)</title>
+    <title>Редактор Геозон</title>
     
     <link rel="stylesheet" href="styles.css">
     <!-- Leaflet CSS -->
@@ -400,7 +400,7 @@
                 inputType = 'geojson';
                 loadGeoJSON(data);
             } else if (data.zones && Array.isArray(data.zones)) {
-                inputType = 'custom'; // NovaBev / Yandex format
+                inputType = 'custom'; // Yandex / custom format
                 loadCustomFormat(data);
             } else {
                 // Maybe it's just the raw array? Unlikely but handle if needed
@@ -659,7 +659,7 @@
                 downloadJSON(output, "zones.geojson");
 
             } else {
-                // CUSTOM FORMAT Saving (NovaBev)
+                // CUSTOM FORMAT Saving
                 const activeZones = [];
                 
                 map.eachLayer(layer => {

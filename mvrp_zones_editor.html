@@ -259,11 +259,20 @@
 
         map.pm.setLang('ru');
 
+        map.on('pm:edit', e => {
+            const layer = e.layer;
+            if (layer && (layer === currentEditingLayer || layer.pm && layer.pm.enabled())) {
+                updateIntersectionMarkersForLayer(layer);
+            }
+        });
+
         // --- State Management ---
         let originalData = { zones: [] }; // Default empty structure
         let inputType = 'custom'; 
         let layersMap = new Map(); // Layer ID -> Data Object (reference)
         let layerToListMap = new Map(); // Layer ID -> List Item Element
+        let intersectionMarkersLayer = null; // L.LayerGroup для красных кружков самопересечений
+        const INTERSECTION_CLUSTER_RADIUS_M = 100; // объединять точки самопересечения в радиусе 100м
 
         function isAnyLayerInEditMode() {
              let isEditing = false;
@@ -376,6 +385,7 @@
 
         function loadData(data) {
             // Cleanup
+            clearIntersectionMarkers();
             map.eachLayer(layer => {
                 if (layer instanceof L.Path || layer instanceof L.Marker) map.removeLayer(layer);
             });
@@ -398,6 +408,7 @@
                 return;
             }
             updateZoneCount();
+            updateIntersectionMarkersForAllLayers();
         }
 
         function loadCustomFormat(data) {
@@ -507,6 +518,7 @@
                     btn.style.opacity = '1';
                     li.classList.remove('hidden-zone');
                 }
+                updateIntersectionMarkersForAllLayers();
             };
 
             li.querySelector('.zone-info').onclick = () => {
@@ -532,6 +544,7 @@
                     layer.pm.enable({ allowSelfIntersection: false });
                     currentEditingLayer = layer;
                     showFinishButton(true);
+                    updateIntersectionMarkersForLayer(layer);
                 }
             } else {
                 showStatus('Зона скрыта. Включите видимость для редактирования.');
@@ -543,6 +556,7 @@
             map.eachLayer(l => { if (l.pm) l.pm.disable(); });
             map.pm.disableGlobalEditMode();
             currentEditingLayer = null;
+            clearIntersectionMarkers();
             showFinishButton(false);
             document.querySelectorAll('.zone-item').forEach(el => el.classList.remove('active'));
             showStatus('Редактирование завершено');
@@ -735,6 +749,125 @@
         function getRandomColor(index) {
             const colors = ['#ef4444', '#f97316', '#f59e0b', '#84cc16', '#10b981', '#06b6d4', '#3b82f6', '#6366f1', '#8b5cf6', '#d946ef', '#f43f5e'];
             return colors[index % colors.length];
+        }
+
+        // Самопересечения: поиск и отрисовка красных кружков
+
+        function segmentIntersection(p1, p2, p3, p4) {
+            const [x1, y1] = [p1.lng, p1.lat];
+            const [x2, y2] = [p2.lng, p2.lat];
+            const [x3, y3] = [p3.lng, p3.lat];
+            const [x4, y4] = [p4.lng, p4.lat];
+            const d = (x1 - x2) * (y3 - y4) - (y1 - y2) * (x3 - x4);
+            if (Math.abs(d) < 1e-10) return null;
+            const t = ((x1 - x3) * (y3 - y4) - (y1 - y3) * (x3 - x4)) / d;
+            const u = -((x1 - x2) * (y1 - y3) - (y1 - y2) * (x1 - x3)) / d;
+            if (t >= 0 && t <= 1 && u >= 0 && u <= 1) {
+                return { lat: y1 + t * (y2 - y1), lng: x1 + t * (x2 - x1) };
+            }
+            return null;
+        }
+
+        function getPolygonEdges(latlngs) {
+            const ring = Array.isArray(latlngs[0]) ? latlngs[0] : latlngs;
+            const points = ring.map(p => (p.lat !== undefined ? p : { lat: p[1], lng: p[0] }));
+            const edges = [];
+            for (let i = 0; i < points.length - 1; i++) {
+                edges.push([points[i], points[i + 1]]);
+            }
+            if (points.length > 2) edges.push([points[points.length - 1], points[0]]);
+            return edges;
+        }
+
+        function findSelfIntersections(layer) {
+            const latlngs = layer.getLatLngs();
+            const ring = (latlngs && latlngs[0]) ? latlngs[0] : latlngs;
+            if (!ring || ring.length < 4) return [];
+            const edges = getPolygonEdges(ring);
+            const out = [];
+            for (let i = 0; i < edges.length; i++) {
+                for (let j = i + 2; j < edges.length; j++) {
+                    if (i === 0 && j === edges.length - 1) continue;
+                    const pt = segmentIntersection(edges[i][0], edges[i][1], edges[j][0], edges[j][1]);
+                    if (pt) out.push(pt);
+                }
+            }
+            return out;
+        }
+
+        function clusterPoints(points, radiusM) {
+            if (points.length === 0) return [];
+            const result = [];
+            const used = new Set();
+            for (let i = 0; i < points.length; i++) {
+                if (used.has(i)) continue;
+                const group = [points[i]];
+                used.add(i);
+                for (let j = i + 1; j < points.length; j++) {
+                    if (used.has(j)) continue;
+                    const dist = L.latLng(points[i].lat, points[i].lng).distanceTo(L.latLng(points[j].lat, points[j].lng));
+                    if (dist <= radiusM) {
+                        group.push(points[j]);
+                        used.add(j);
+                    }
+                }
+                const lat = group.reduce((s, p) => s + p.lat, 0) / group.length;
+                const lng = group.reduce((s, p) => s + p.lng, 0) / group.length;
+                result.push({ lat, lng });
+            }
+            return result;
+        }
+
+        function ensureIntersectionMarkersLayer() {
+            if (!intersectionMarkersLayer) {
+                intersectionMarkersLayer = L.layerGroup().addTo(map);
+            }
+            return intersectionMarkersLayer;
+        }
+
+        function clearIntersectionMarkers() {
+            if (intersectionMarkersLayer) {
+                intersectionMarkersLayer.clearLayers();
+            }
+        }
+
+        function updateIntersectionMarkersForLayer(layer) {
+            if (!layer || !(layer instanceof L.Polygon) && !(layer instanceof L.Rectangle)) return;
+            clearIntersectionMarkers();
+            const points = findSelfIntersections(layer);
+            const clustered = clusterPoints(points, INTERSECTION_CLUSTER_RADIUS_M);
+            const group = ensureIntersectionMarkersLayer();
+            clustered.forEach(pt => {
+                L.circleMarker([pt.lat, pt.lng], {
+                    radius: 10,
+                    color: '#c00',
+                    fillColor: '#f00',
+                    fillOpacity: 0.7,
+                    weight: 2,
+                    interactive: false
+                }).addTo(group);
+            });
+        }
+
+        function updateIntersectionMarkersForAllLayers() {
+            clearIntersectionMarkers();
+            const group = ensureIntersectionMarkersLayer();
+            map.eachLayer(layer => {
+                if ((layer instanceof L.Polygon || layer instanceof L.Rectangle) && layersMap.has(L.stamp(layer))) {
+                    const points = findSelfIntersections(layer);
+                    const clustered = clusterPoints(points, INTERSECTION_CLUSTER_RADIUS_M);
+                    clustered.forEach(pt => {
+                        L.circleMarker([pt.lat, pt.lng], {
+                            radius: 10,
+                            color: '#c00',
+                            fillColor: '#f00',
+                            fillOpacity: 0.7,
+                            weight: 2,
+                            interactive: false
+                        }).addTo(group);
+                    });
+                }
+            });
         }
     </script>
 </body>

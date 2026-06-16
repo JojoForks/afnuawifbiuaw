@@ -4,6 +4,7 @@
 	<meta charset="UTF-8">
 	<link rel="stylesheet" href="styles.css">
 	<script src="https://cdnjs.cloudflare.com/ajax/libs/Turf.js/6.5.0/turf.min.js"></script>
+	<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 	<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
 	<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
 	<style>
@@ -141,6 +142,7 @@
 		<div id="map" style="margin: 12px 0;"></div>
 
 		<button id="toggleCostSettingsButton" class="btn btn-secondary" style="margin: 1rem 0;">Показать настройки стоимости</button>
+		<button id="toggleOptionalSettingsButton" class="btn btn-secondary" style="margin: 1rem 0 1rem 12px;">Показать настройки Опциональные Excel</button>
 		<div id="costSettingsGroup" class="group" style="display: none;">
 			<h3>Генерация формулы штрафов за доп зоны</h3>
 			<div style="margin-bottom: 1rem;">
@@ -161,12 +163,30 @@
 			<div id="penaltyPreview" style="margin-top: 1rem; display: none;"></div>
 		</div>
 
+		<div id="optionalSettingsGroup" class="group" style="display: none;">
+			<h3>Опциональные геозоны (Excel)</h3>
+			<p style="font-size:0.875rem; margin-bottom:1rem;">
+				На каждую зону делается своя строка: сама зона в плюс, соседи в минус.
+				Чем дальше сосед, тем больше штраф.
+			</p>
+			<label for="optionalRewardInput">Поощрение центра:</label><br>
+			<input type="number" id="optionalRewardInput" value="100" style="width:200px; margin-bottom:1rem;"><br>
+			<label for="optionalBasePenaltyInput">Штраф 1-го уровня (соседи):</label><br>
+			<input type="number" id="optionalBasePenaltyInput" value="200" min="0" style="width:200px; margin-bottom:1rem;"><br>
+			<label for="optionalGrowthInput">Множитель роста штрафа за уровень:</label><br>
+			<input type="number" id="optionalGrowthInput" value="2" step="0.1" min="1" style="width:200px; margin-bottom:1rem;"><br>
+			<label for="optionalMaxLevelsInput">Макс. уровней (0 = без ограничения):</label><br>
+			<input type="number" id="optionalMaxLevelsInput" value="0" min="0" style="width:200px; margin-bottom:1rem;"><br>
+			<label style="min-width:auto;"><input type="checkbox" id="optionalIncludeUnreachable" checked> Штрафовать недостижимые зоны (макс. штраф)</label>
+		</div>
+
 		<div class="group">
 			<label for="penaltyValueInput">Штраф за несовместимость:</label>
 			<input type="number" id="penaltyValueInput" value="1000000000" min="1" style="width: 200px; margin-bottom: 1rem;"><br>
 			<button id="savePresetButton" class="btn btn-success">💾 Скачать пресет</button>
-			<button id="savePlanningButton" class="btn btn-success" style="margin-left:12px; display:none;">💾 Скачать планирование</button>
-			<button id="saveCostFormulaButton" class="btn btn-success" style="margin-left:12px;">💾 Скачать cost формулу</button>
+			<button id="savePlanningButton" class="btn btn-success" style="margin-left:12px; display:none;">Скачать планирование</button>
+			<button id="saveCostFormulaButton" class="btn btn-success" style="margin-left:12px;">Скачать cost формулу</button>
+			<button id="saveOptionalZonesExcelButton" class="btn btn-success" style="margin-left:12px;">Скачать Excel опц. зоны</button>
 		</div>
 	</div>
 
@@ -349,48 +369,81 @@
 			const edges = new Map();
 			for (let name of allZoneNames) edges.set(name, new Set());
 
-			const featureCoords = currentFeatures.map(feature => turf.coordAll(feature));
+			const R = 6371008.8;            // радиус Земли, как в turf.distance
+			const D2R = Math.PI / 180;
+			const latMPerDeg = R * D2R;     // метров на градус широты
+
+			// заранее считаем по каждой зоне вершины в радианах с cos(широты) и bbox,
+			// чтобы не дёргать turf.point и тригонометрию на каждой паре
+
+			const featurePoints = currentFeatures.map(feature =>
+				turf.coordAll(feature).map(c => {
+					const latRad = c[1] * D2R;
+					return { latRad, lngRad: c[0] * D2R, cosLat: Math.cos(latRad) };
+				})
+			);
+			const featureBBoxes = currentFeatures.map(f => turf.bbox(f)); // [minLng,minLat,maxLng,maxLat]
+
 			const totalPairs = (currentFeatures.length * (currentFeatures.length - 1)) / 2;
 			let processedPairs = 0;
+			const YIELD_EVERY = 5000;
 
 			for (let i = 0; i < currentFeatures.length; i++) {
 				const feature1 = currentFeatures[i];
 				const name1 = feature1.properties.description;
+				const bb1 = featureBBoxes[i];
+				const pts1 = featurePoints[i];
+
 				for (let j = i + 1; j < currentFeatures.length; j++) {
 					const feature2 = currentFeatures[j];
 					const name2 = feature2.properties.description;
+					const bb2 = featureBBoxes[j];
 
-					const intersects = turf.booleanIntersects(feature1, feature2);
-
-					let minDistance = Infinity;
-					const coords1 = featureCoords[i];
-					const coords2 = featureCoords[j];
-					for (let p1 of coords1) {
-						for (let p2 of coords2) {
-							const point1 = turf.point(p1);
-							const point2 = turf.point(p2);
-							const distance = turf.distance(point1, point2, { units: 'meters' });
-							if (distance < minDistance) minDistance = distance;
-							if (minDistance <= radius) break;
-						}
-						if (minDistance <= radius) break;
+					processedPairs++;
+					if (processedPairs % YIELD_EVERY === 0) {
+						progressBar.style.width = (processedPairs / totalPairs * 100) + '%';
+						progressText.textContent = `Обработано ${processedPairs} из ${totalPairs} пар зон`;
+						await new Promise(resolve => setTimeout(resolve));
 					}
 
-					if (intersects || minDistance <= radius) {
+					// отсекаем по bbox: если зоны дальше радиуса хотя бы по одной оси,
+					// то они не близки и не пересекаются. оценка занижена, лишнего не отрежем.
+					const latGapDeg = Math.max(0, bb1[1] - bb2[3], bb2[1] - bb1[3]);
+					if (latGapDeg * latMPerDeg > radius) continue;
+
+					const lngGapDeg = Math.max(0, bb1[0] - bb2[2], bb2[0] - bb1[2]);
+					if (lngGapDeg > 0) {
+						const maxAbsLat = Math.max(Math.abs(bb1[1]), Math.abs(bb1[3]), Math.abs(bb2[1]), Math.abs(bb2[3]));
+						if (lngGapDeg * latMPerDeg * Math.cos(maxAbsLat * D2R) > radius) continue;
+					}
+
+					// точное минимальное расстояние между вершинами, haversine вручную,
+					// без лишних объектов и с ранним выходом.
+					let minDistance = Infinity;
+					const pts2 = featurePoints[j];
+					for (let a = 0; a < pts1.length && minDistance > radius; a++) {
+						const p1 = pts1[a];
+						for (let b = 0; b < pts2.length; b++) {
+							const p2 = pts2[b];
+							const sLat = Math.sin((p2.latRad - p1.latRad) / 2);
+							const sLng = Math.sin((p2.lngRad - p1.lngRad) / 2);
+							const h = sLat * sLat + p1.cosLat * p2.cosLat * sLng * sLng;
+							const dist = 2 * R * Math.asin(Math.min(1, Math.sqrt(h)));
+							if (dist < minDistance) minDistance = dist;
+							if (minDistance <= radius) break;
+						}
+					}
+
+					// booleanIntersects тяжёлый, зовём только если по расстоянию не близко.
+					if (minDistance <= radius || turf.booleanIntersects(feature1, feature2)) {
 						edges.get(name1).add(name2);
 						edges.get(name2).add(name1);
 					}
-
-					processedPairs++;
-					const progress = (processedPairs / totalPairs) * 100;
-					progressBar.style.width = progress + '%';
-					progressText.textContent = `Обработано ${processedPairs} из ${totalPairs} пар зон`;
-
-					if (processedPairs % 100 === 0) {
-						await new Promise(resolve => setTimeout(resolve, 10));
-					}
 				}
 			}
+
+			progressBar.style.width = '100%';
+			progressText.textContent = `Обработано ${totalPairs} из ${totalPairs} пар зон`;
 
 		selectedNeighborsByZone = edges;
 		adjacencyGlobal = new Map();
@@ -561,6 +614,131 @@
 		
 		const formula = buildIncompatibilityCostFormula(incompatibleExport, compatibleExport, penalty);
 		downloadJsonFile({ cost: formula }, 'incompatibility_cost_formula.json');
+	});
+
+	// собираем строку для одной зоны: сам центр в плюс (reward), соседи в минус.
+	// чем дальше зона по графу соседей, тем больше штраф: basePenalty * growth^(k-1).
+	function buildOptionalZonesRows(reward, basePenalty, growth, maxLevels, includeUnreachable) {
+		const zones = allZoneNames.slice().sort();
+		const rows = [];
+
+		for (const start of zones) {
+			const visited = new Set([start]);
+			const entries = [{ zone: start, value: Math.round(reward) }];
+			let frontier = [start];
+			let level = 1;
+			let deepestLevel = 0;
+
+			while (frontier.length > 0 && (maxLevels <= 0 || level <= maxLevels)) {
+				const next = [];
+				for (const z of frontier) {
+					const neighbors = selectedNeighborsByZone.get(z);
+					if (!neighbors) continue;
+					for (const n of neighbors) {
+						if (!visited.has(n)) {
+							visited.add(n);
+							next.push(n);
+						}
+					}
+				}
+				if (next.length === 0) break;
+				next.sort();
+				const value = -Math.round(basePenalty * Math.pow(growth, level - 1));
+				for (const n of next) entries.push({ zone: n, value });
+				frontier = next;
+				deepestLevel = level;
+				level++;
+			}
+
+			// до кого вообще не дошли (изолированные или другой кусок графа) считаем
+			// бесконечно далёкими: даём самый большой штраф, на шаг дальше самого дальнего.
+			if (includeUnreachable) {
+				const unreachable = zones.filter(z => !visited.has(z));
+				if (unreachable.length > 0) {
+					const value = -Math.round(basePenalty * Math.pow(growth, deepestLevel));
+					for (const z of unreachable) entries.push({ zone: z, value });
+				}
+			}
+
+			rows.push(entries);
+		}
+
+		return rows;
+	}
+
+	document.getElementById('saveOptionalZonesExcelButton').addEventListener('click', () => {
+		if (!allZoneNames || allZoneNames.length === 0) {
+			alert('Нет загруженных зон. Сначала загрузите данные.');
+			return;
+		}
+		if (typeof XLSX === 'undefined') {
+			alert('Библиотека XLSX не загрузилась. Проверьте подключение к интернету.');
+			return;
+		}
+
+		const reward = parseFloat(document.getElementById('optionalRewardInput').value) || 0;
+		const basePenalty = parseFloat(document.getElementById('optionalBasePenaltyInput').value) || 0;
+		const growth = parseFloat(document.getElementById('optionalGrowthInput').value) || 2;
+		const maxLevels = parseInt(document.getElementById('optionalMaxLevelsInput').value) || 0;
+		const includeUnreachable = document.getElementById('optionalIncludeUnreachable').checked;
+
+		const rows = buildOptionalZonesRows(reward, basePenalty, growth, maxLevels, includeUnreachable);
+		const maxLen = rows.reduce((m, r) => Math.max(m, r.length), 0);
+
+		const header = ['Геозона курьера'];
+		for (let k = 0; k < maxLen; k++) {
+			header.push(`optional_zones.${k}.zone`, `optional_zones.${k}.value`);
+		}
+
+		const aoa = [header];
+		for (const r of rows) {
+			const line = [r.length > 0 ? r[0].zone : ''];
+			for (let k = 0; k < maxLen; k++) {
+				if (k < r.length) {
+					line.push(r[k].zone, r[k].value);
+				} else {
+					line.push('', '');
+				}
+			}
+			aoa.push(line);
+		}
+
+		const ws = XLSX.utils.aoa_to_sheet(aoa);
+		const wb = XLSX.utils.book_new();
+		XLSX.utils.book_append_sheet(wb, ws, 'optional_zones');
+
+		// вторая страница: геозона курьера и его формула.
+		// штраф берём за факт захода в доп. зону (has_location = 0 или 1),
+		// а не за каждый заказ, как тарифицируется на первом листе.
+		const escZone = z => String(z).replace(/'/g, "\\'");
+		const aoa2 = [['Геозона курьера', 'Формула курьера']];
+		for (const r of rows) {
+			const center = r.length > 0 ? r[0].zone : '';
+			const terms = [];
+			for (let i = 1; i < r.length; i++) {
+				const e = r[i];
+				if (e.value < 0) {
+					terms.push(`${-e.value} * has_location(in_zone('${escZone(e.zone)}'))`);
+				}
+			}
+			aoa2.push([center, terms.length > 0 ? terms.join(' + ') : '0']);
+		}
+		const ws2 = XLSX.utils.aoa_to_sheet(aoa2);
+		XLSX.utils.book_append_sheet(wb, ws2, 'courier_formulas');
+
+		XLSX.writeFile(wb, 'optional_zones.xlsx');
+	});
+
+	document.getElementById('toggleOptionalSettingsButton').addEventListener('click', () => {
+		const settingsGroup = document.getElementById('optionalSettingsGroup');
+		const button = document.getElementById('toggleOptionalSettingsButton');
+		if (settingsGroup.style.display === 'none') {
+			settingsGroup.style.display = 'block';
+			button.textContent = 'Скрыть настройки Опциональные Excel';
+		} else {
+			settingsGroup.style.display = 'none';
+			button.textContent = 'Показать настройки Опциональные Excel';
+		}
 	});
 
 		function extractCompatibleGroupsFromPlanning() {
